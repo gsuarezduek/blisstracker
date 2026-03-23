@@ -70,4 +70,46 @@ async function byUser(req, res, next) {
   } catch (err) { next(err) }
 }
 
-module.exports = { byProject, byUser }
+// Returns all users with their tasks grouped by project
+async function byUserSummary(req, res, next) {
+  try {
+    const { from, to } = req.query
+    const where = { status: 'COMPLETED', startedAt: { not: null }, completedAt: { not: null } }
+    if (from || to) {
+      where.workDay = {}
+      if (from) where.workDay.date = { gte: from }
+      if (to) where.workDay.date = { ...where.workDay.date, lte: to }
+    }
+
+    const tasks = await prisma.task.findMany({
+      where,
+      include: {
+        project: true,
+        user: { select: { id: true, name: true, role: true } },
+      },
+      orderBy: { completedAt: 'asc' },
+    })
+
+    // Group by user → project → tasks
+    const map = {}
+    for (const t of tasks) {
+      const mins = Math.round((new Date(t.completedAt) - new Date(t.startedAt)) / 60000)
+      const uid = t.user.id
+      if (!map[uid]) map[uid] = { user: t.user, totalMinutes: 0, taskCount: 0, byProject: {} }
+      map[uid].totalMinutes += mins
+      map[uid].taskCount += 1
+      const pid = t.project.id
+      if (!map[uid].byProject[pid]) map[uid].byProject[pid] = { project: t.project, minutes: 0, taskList: [] }
+      map[uid].byProject[pid].minutes += mins
+      map[uid].byProject[pid].taskList.push({ id: t.id, description: t.description, minutes: mins, completedAt: t.completedAt })
+    }
+
+    const result = Object.values(map)
+      .map(({ byProject, ...rest }) => ({ ...rest, byProject: Object.values(byProject) }))
+      .sort((a, b) => b.totalMinutes - a.totalMinutes)
+
+    res.json(result)
+  } catch (err) { next(err) }
+}
+
+module.exports = { byProject, byUser, byUserSummary }

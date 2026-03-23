@@ -9,6 +9,7 @@ const tasksRoutes = require('./routes/tasks.routes')
 const workdaysRoutes = require('./routes/workdays.routes')
 const reportsRoutes = require('./routes/reports.routes')
 const realtimeRoutes = require('./routes/realtime.routes')
+const servicesRoutes = require('./routes/services.routes')
 
 const app = express()
 
@@ -22,6 +23,7 @@ app.use('/api/tasks', tasksRoutes)
 app.use('/api/workdays', workdaysRoutes)
 app.use('/api/reports', reportsRoutes)
 app.use('/api/realtime', realtimeRoutes)
+app.use('/api/services', servicesRoutes)
 
 app.get('/api/health', (_, res) => res.json({ ok: true }))
 

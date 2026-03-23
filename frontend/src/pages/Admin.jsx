@@ -1,11 +1,13 @@
 import Navbar from '../components/Navbar'
 import ProjectsTab from '../components/admin/ProjectsTab'
 import TeamTab from '../components/admin/TeamTab'
+import ServicesTab from '../components/admin/ServicesTab'
 import { useState } from 'react'
 
 const TABS = [
   { id: 'projects', label: '📁 Proyectos' },
   { id: 'team', label: '👥 Equipo' },
+  { id: 'services', label: '🛠 Servicios' },
 ]
 
 export default function Admin() {
@@ -36,6 +38,7 @@ export default function Admin() {
 
         {tab === 'projects' && <ProjectsTab />}
         {tab === 'team' && <TeamTab />}
+        {tab === 'services' && <ServicesTab />}
       </main>
     </div>
   )
