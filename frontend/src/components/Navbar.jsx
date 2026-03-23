@@ -1,5 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import FeedbackButton from './FeedbackButton'
 
 const ROLE_LABELS = {
   ADMIN: 'Administrador',
@@ -20,6 +21,8 @@ export default function Navbar() {
   }
 
   return (
+    <>
+    <FeedbackButton />
     <nav className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
       <div className="flex items-center gap-6">
         <span className="text-xl font-bold text-primary-600">Bliss Tracker</span>
@@ -48,5 +51,6 @@ export default function Navbar() {
         </button>
       </div>
     </nav>
+    </>
   )
 }
