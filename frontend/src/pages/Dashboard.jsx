@@ -65,13 +65,15 @@ export default function Dashboard() {
   }
 
   const tasks = workDay?.tasks ?? []
-  const pending = tasks.filter(t => t.status === 'PENDING')
+  const pending    = tasks.filter(t => t.status === 'PENDING')
   const inProgress = tasks.filter(t => t.status === 'IN_PROGRESS')
-  const completed = tasks.filter(t => t.status === 'COMPLETED')
+  const paused     = tasks.filter(t => t.status === 'PAUSED')
+  const completed  = tasks.filter(t => t.status === 'COMPLETED')
+  const hasActiveTask = inProgress.length > 0
 
   const totalMins = completed.reduce((acc, t) => {
     if (!t.startedAt || !t.completedAt) return acc
-    return acc + Math.round((new Date(t.completedAt) - new Date(t.startedAt)) / 60000)
+    return acc + Math.max(0, Math.round((new Date(t.completedAt) - new Date(t.startedAt)) / 60000) - (t.pausedMinutes || 0))
   }, 0)
 
   return (
@@ -140,7 +142,18 @@ export default function Dashboard() {
             <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">En curso</h2>
             <div className="space-y-2">
               {inProgress.map(t => (
-                <TaskCard key={t.id} task={t} onUpdate={handleUpdateTask} onDelete={handleDeleteTask} />
+                <TaskCard key={t.id} task={t} onUpdate={handleUpdateTask} onDelete={handleDeleteTask} hasActiveTask={hasActiveTask} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {paused.length > 0 && (
+          <section className="mb-6">
+            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Pausadas</h2>
+            <div className="space-y-2">
+              {paused.map(t => (
+                <TaskCard key={t.id} task={t} onUpdate={handleUpdateTask} onDelete={handleDeleteTask} hasActiveTask={hasActiveTask} />
               ))}
             </div>
           </section>
@@ -151,7 +164,7 @@ export default function Dashboard() {
             <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Pendientes</h2>
             <div className="space-y-2">
               {pending.map(t => (
-                <TaskCard key={t.id} task={t} onUpdate={handleUpdateTask} onDelete={handleDeleteTask} />
+                <TaskCard key={t.id} task={t} onUpdate={handleUpdateTask} onDelete={handleDeleteTask} hasActiveTask={hasActiveTask} />
               ))}
             </div>
           </section>
@@ -162,7 +175,7 @@ export default function Dashboard() {
             <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Completadas</h2>
             <div className="space-y-2">
               {completed.map(t => (
-                <TaskCard key={t.id} task={t} onUpdate={handleUpdateTask} onDelete={handleDeleteTask} />
+                <TaskCard key={t.id} task={t} onUpdate={handleUpdateTask} onDelete={handleDeleteTask} hasActiveTask={hasActiveTask} />
               ))}
             </div>
           </section>

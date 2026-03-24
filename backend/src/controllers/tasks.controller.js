@@ -13,7 +13,6 @@ async function create(req, res, next) {
       return res.status(400).json({ error: 'Descripción y proyecto requeridos' })
     }
 
-    // Ensure workday exists for today
     const date = todayString()
     let workDay = await prisma.workDay.findUnique({
       where: { userId_date: { userId, date } },
@@ -23,12 +22,7 @@ async function create(req, res, next) {
     }
 
     const task = await prisma.task.create({
-      data: {
-        description,
-        projectId: Number(projectId),
-        userId,
-        workDayId: workDay.id,
-      },
+      data: { description, projectId: Number(projectId), userId, workDayId: workDay.id },
       include: { project: true },
     })
     res.status(201).json(task)
@@ -37,10 +31,72 @@ async function create(req, res, next) {
 
 async function startTask(req, res, next) {
   try {
-    const { id } = req.params
+    const userId = req.user.id
+
+    // Only one task can be IN_PROGRESS at a time
+    const active = await prisma.task.findFirst({
+      where: { userId, status: 'IN_PROGRESS' },
+    })
+    if (active) {
+      return res.status(409).json({ error: 'Ya tenés una tarea en curso. Pausala o completala primero.' })
+    }
+
     const task = await prisma.task.update({
-      where: { id: Number(id), userId: req.user.id },
+      where: { id: Number(req.params.id), userId },
       data: { status: 'IN_PROGRESS', startedAt: new Date() },
+      include: { project: true },
+    })
+    res.json(task)
+  } catch (err) {
+    if (err.code === 'P2025') return res.status(404).json({ error: 'Tarea no encontrada' })
+    next(err)
+  }
+}
+
+async function pauseTask(req, res, next) {
+  try {
+    const task = await prisma.task.update({
+      where: { id: Number(req.params.id), userId: req.user.id },
+      data: { status: 'PAUSED', pausedAt: new Date() },
+      include: { project: true },
+    })
+    res.json(task)
+  } catch (err) {
+    if (err.code === 'P2025') return res.status(404).json({ error: 'Tarea no encontrada' })
+    next(err)
+  }
+}
+
+async function resumeTask(req, res, next) {
+  try {
+    const userId = req.user.id
+
+    // Only one task can be IN_PROGRESS at a time
+    const active = await prisma.task.findFirst({
+      where: { userId, status: 'IN_PROGRESS' },
+    })
+    if (active) {
+      return res.status(409).json({ error: 'Ya tenés una tarea en curso. Pausala o completala primero.' })
+    }
+
+    const current = await prisma.task.findUnique({
+      where: { id: Number(req.params.id) },
+    })
+    if (!current || current.userId !== userId) {
+      return res.status(404).json({ error: 'Tarea no encontrada' })
+    }
+
+    // Accumulate the time spent paused
+    const pausedMs   = current.pausedAt ? Date.now() - new Date(current.pausedAt).getTime() : 0
+    const addedMins  = Math.round(pausedMs / 60000)
+
+    const task = await prisma.task.update({
+      where: { id: Number(req.params.id) },
+      data: {
+        status:        'IN_PROGRESS',
+        pausedAt:      null,
+        pausedMinutes: { increment: addedMins },
+      },
       include: { project: true },
     })
     res.json(task)
@@ -52,10 +108,9 @@ async function startTask(req, res, next) {
 
 async function completeTask(req, res, next) {
   try {
-    const { id } = req.params
     const task = await prisma.task.update({
-      where: { id: Number(id), userId: req.user.id },
-      data: { status: 'COMPLETED', completedAt: new Date() },
+      where: { id: Number(req.params.id), userId: req.user.id },
+      data: { status: 'COMPLETED', completedAt: new Date(), pausedAt: null },
       include: { project: true },
     })
     res.json(task)
@@ -67,10 +122,7 @@ async function completeTask(req, res, next) {
 
 async function remove(req, res, next) {
   try {
-    const { id } = req.params
-    await prisma.task.delete({
-      where: { id: Number(id), userId: req.user.id },
-    })
+    await prisma.task.delete({ where: { id: Number(req.params.id), userId: req.user.id } })
     res.json({ ok: true })
   } catch (err) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'Tarea no encontrada' })
@@ -78,4 +130,4 @@ async function remove(req, res, next) {
   }
 }
 
-module.exports = { create, startTask, completeTask, remove }
+module.exports = { create, startTask, pauseTask, resumeTask, completeTask, remove }

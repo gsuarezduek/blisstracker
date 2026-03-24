@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import Navbar from '../components/Navbar'
+import DateRangeFilter from '../components/DateRangeFilter'
 import api from '../api/client'
 
 const ROLE_LABELS = {
@@ -17,16 +18,6 @@ function fmtMins(mins) {
   return `${Math.floor(mins / 60)}h ${mins % 60}m`
 }
 
-function thisWeekRange() {
-  const now = new Date()
-  const day = now.getDay() || 7
-  const mon = new Date(now)
-  mon.setDate(now.getDate() - day + 1)
-  return {
-    from: mon.toISOString().slice(0, 10),
-    to: now.toISOString().slice(0, 10),
-  }
-}
 
 // ── By Project View ────────────────────────────────────────────────────────────
 
@@ -246,14 +237,18 @@ export default function Reports() {
   const [projectData, setProjectData] = useState([])
   const [personData, setPersonData] = useState([])
   const [loading, setLoading] = useState(false)
-  const [from, setFrom] = useState(thisWeekRange().from)
-  const [to, setTo] = useState(thisWeekRange().to)
+  const [from, setFrom] = useState(() => {
+    const now = new Date(); const day = now.getDay() || 7
+    const mon = new Date(now); mon.setDate(now.getDate() - day + 1)
+    return mon.toLocaleDateString('en-CA')
+  })
+  const [to, setTo] = useState(() => new Date().toLocaleDateString('en-CA'))
 
-  async function loadReport() {
+  async function loadReport(f = from, t = to) {
     setLoading(true)
     const params = new URLSearchParams()
-    if (from) params.append('from', from)
-    if (to) params.append('to', to)
+    if (f) params.append('from', f)
+    if (t) params.append('to', t)
     try {
       const [proj, person] = await Promise.all([
         api.get(`/reports/by-project?${params}`),
@@ -274,23 +269,11 @@ export default function Reports() {
       <main className="max-w-4xl mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Reportes</h1>
 
-        {/* Filters */}
-        <div className="flex gap-3 mb-6 items-end flex-wrap">
-          <div>
-            <label className="text-xs font-medium text-gray-600">Desde</label>
-            <input type="date" value={from} onChange={e => setFrom(e.target.value)}
-              className="mt-1 block border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-gray-600">Hasta</label>
-            <input type="date" value={to} onChange={e => setTo(e.target.value)}
-              className="mt-1 block border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
-          </div>
-          <button onClick={loadReport} disabled={loading}
-            className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-60">
-            {loading ? 'Cargando...' : 'Ver reporte'}
-          </button>
-        </div>
+        <DateRangeFilter
+          from={from} to={to}
+          onFromChange={setFrom} onToChange={setTo}
+          onSearch={loadReport} loading={loading}
+        />
 
         {/* View toggle */}
         <div className="flex gap-1 bg-white border rounded-xl p-1 mb-6 w-fit">

@@ -19,6 +19,7 @@ enum Role {
 enum TaskStatus {
   PENDING
   IN_PROGRESS
+  PAUSED
   COMPLETED
 }
 
@@ -35,6 +36,7 @@ model User {
   workDays WorkDay[]
   tasks    Task[]
   feedbacks Feedback[]
+  projects  ProjectMember[]
 }
 
 model Feedback {
@@ -61,6 +63,7 @@ model Project {
 
   tasks    Task[]
   services ProjectService[]
+  members  ProjectMember[]
 }
 
 model Service {
@@ -80,6 +83,15 @@ model ProjectService {
   service   Service @relation(fields: [serviceId], references: [id])
 
   @@id([projectId, serviceId])
+}
+
+model ProjectMember {
+  projectId Int
+  userId    Int
+  project   Project @relation(fields: [projectId], references: [id])
+  user      User    @relation(fields: [userId], references: [id])
+
+  @@id([projectId, userId])
 }
 
 model WorkDay {
@@ -104,10 +116,12 @@ model Task {
   user        User       @relation(fields: [userId], references: [id])
   projectId   Int
   project     Project    @relation(fields: [projectId], references: [id])
-  description String
-  status      TaskStatus @default(PENDING)
-  startedAt   DateTime?
-  completedAt DateTime?
+  description   String
+  status        TaskStatus @default(PENDING)
+  startedAt     DateTime?
+  pausedAt      DateTime?
+  pausedMinutes Int        @default(0)
+  completedAt   DateTime?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 }

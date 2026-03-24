@@ -26,17 +26,23 @@ export default function Navbar() {
     <nav className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
       <div className="flex items-center gap-6">
         <span className="text-xl font-bold text-primary-600">Bliss Tracker</span>
-        {user?.role === 'ADMIN' && (
-          <div className="flex gap-4 text-sm">
-            <Link to="/" className="text-gray-600 hover:text-primary-600 transition-colors">Dashboard</Link>
-            <Link to="/realtime" className="text-gray-600 hover:text-primary-600 transition-colors flex items-center gap-1">
-              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-              Tiempo Real
-            </Link>
-            <Link to="/reports" className="text-gray-600 hover:text-primary-600 transition-colors">Reportes</Link>
-            <Link to="/admin" className="text-gray-600 hover:text-primary-600 transition-colors">Administración</Link>
-          </div>
-        )}
+        <div className="flex gap-4 text-sm">
+          <Link to="/" className="text-gray-600 hover:text-primary-600 transition-colors">Dashboard</Link>
+          <Link to="/my-projects" className="text-gray-600 hover:text-primary-600 transition-colors">Mis Proyectos</Link>
+          {user?.role !== 'ADMIN' && (
+            <Link to="/my-reports" className="text-gray-600 hover:text-primary-600 transition-colors">Mis Reportes</Link>
+          )}
+          {user?.role === 'ADMIN' && (
+            <>
+              <Link to="/realtime" className="text-gray-600 hover:text-primary-600 transition-colors flex items-center gap-1">
+                <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                Tiempo Real
+              </Link>
+              <Link to="/reports" className="text-gray-600 hover:text-primary-600 transition-colors">Reportes</Link>
+              <Link to="/admin" className="text-gray-600 hover:text-primary-600 transition-colors">Administración</Link>
+            </>
+          )}
+        </div>
       </div>
       <div className="flex items-center gap-4">
         <div className="text-right">

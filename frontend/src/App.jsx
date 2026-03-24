@@ -5,6 +5,8 @@ import Dashboard from './pages/Dashboard'
 import Admin from './pages/Admin'
 import RealTime from './pages/RealTime'
 import Reports from './pages/Reports'
+import MyReports from './pages/MyReports'
+import MyProjects from './pages/MyProjects'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -27,6 +29,8 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+          <Route path="/my-reports"  element={<PrivateRoute><MyReports  /></PrivateRoute>} />
+          <Route path="/my-projects" element={<PrivateRoute><MyProjects /></PrivateRoute>} />
           <Route path="/realtime" element={<AdminRoute><RealTime /></AdminRoute>} />
           <Route path="/reports" element={<AdminRoute><Reports /></AdminRoute>} />
           <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
