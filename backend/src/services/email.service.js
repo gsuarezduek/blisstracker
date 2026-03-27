@@ -1,32 +1,10 @@
-const nodemailer = require('nodemailer')
-const { resolve4 } = require('dns').promises
+const { Resend } = require('resend')
 
-const SMTP_HOST = 'smtp.hostinger.com'
+const resend = new Resend(process.env.RESEND_API_KEY)
 
 async function sendPasswordReset(email, name, resetUrl) {
-  // Resolver manualmente a IPv4 para evitar que Railway use IPv6
-  let host = SMTP_HOST
-  try {
-    const [ip] = await resolve4(SMTP_HOST)
-    host = ip
-    console.log(`[email] Resolvió ${SMTP_HOST} → ${ip}`)
-  } catch (e) {
-    console.warn('[email] No pudo resolver IPv4, usando hostname:', e.message)
-  }
-
-  const transporter = nodemailer.createTransport({
-    host,
-    port: 587,
-    secure: false,
-    tls: { servername: SMTP_HOST },
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  })
-
-  await transporter.sendMail({
-    from: `"Bliss Team Tracker" <${process.env.SMTP_USER}>`,
+  const { error } = await resend.emails.send({
+    from: 'Bliss Team Tracker <gaston@blissmkt.ar>',
     to: email,
     subject: 'Recuperar contraseña — Bliss Team Tracker',
     html: `
@@ -44,6 +22,8 @@ async function sendPasswordReset(email, name, resetUrl) {
       </div>
     `,
   })
+
+  if (error) throw new Error(error.message)
 }
 
 module.exports = { sendPasswordReset }
