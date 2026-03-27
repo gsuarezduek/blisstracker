@@ -1,6 +1,8 @@
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
+const crypto = require('crypto')
 const { PrismaClient } = require('@prisma/client')
+const { sendPasswordReset } = require('../services/email.service')
 
 const prisma = new PrismaClient()
 
@@ -40,4 +42,62 @@ async function me(req, res) {
   res.json(req.user)
 }
 
-module.exports = { login, me }
+async function forgotPassword(req, res, next) {
+  try {
+    const { email } = req.body
+    if (!email) return res.status(400).json({ error: 'Email requerido' })
+
+    const user = await prisma.user.findUnique({ where: { email } })
+    // Siempre responder igual para no revelar si el email existe
+    if (!user || !user.active) {
+      return res.json({ message: 'Si el email existe, recibirás un correo en breve.' })
+    }
+
+    // Invalidar tokens anteriores
+    await prisma.passwordResetToken.updateMany({
+      where: { userId: user.id, used: false },
+      data: { used: true },
+    })
+
+    const token = crypto.randomBytes(32).toString('hex')
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000) // 1 hora
+
+    await prisma.passwordResetToken.create({
+      data: { token, userId: user.id, expiresAt },
+    })
+
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`
+    await sendPasswordReset(user.email, user.name, resetUrl)
+
+    res.json({ message: 'Si el email existe, recibirás un correo en breve.' })
+  } catch (err) {
+    next(err)
+  }
+}
+
+async function resetPassword(req, res, next) {
+  try {
+    const { token, password } = req.body
+    if (!token || !password) return res.status(400).json({ error: 'Datos incompletos' })
+    if (password.length < 6) return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' })
+
+    const resetToken = await prisma.passwordResetToken.findUnique({ where: { token } })
+
+    if (!resetToken || resetToken.used || resetToken.expiresAt < new Date()) {
+      return res.status(400).json({ error: 'El enlace es inválido o ha expirado' })
+    }
+
+    const hashed = await bcrypt.hash(password, 10)
+
+    await prisma.$transaction([
+      prisma.user.update({ where: { id: resetToken.userId }, data: { password: hashed } }),
+      prisma.passwordResetToken.update({ where: { id: resetToken.id }, data: { used: true } }),
+    ])
+
+    res.json({ message: 'Contraseña actualizada correctamente' })
+  } catch (err) {
+    next(err)
+  }
+}
+
+module.exports = { login, me, forgotPassword, resetPassword }

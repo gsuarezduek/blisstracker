@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 export default function Login() {
@@ -9,6 +9,8 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const { login, user } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const resetOk = searchParams.get('reset') === 'ok'
 
   if (user) {
     navigate(user.role === 'ADMIN' ? '/admin' : '/', { replace: true })
@@ -36,6 +38,12 @@ export default function Login() {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Bliss</h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">Team Tracker</p>
         </div>
+
+        {resetOk && (
+          <div className="bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-sm rounded-lg px-4 py-3 mb-5">
+            Contraseña actualizada. Ya podés iniciar sesión.
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
@@ -75,6 +83,15 @@ export default function Login() {
           >
             {loading ? 'Ingresando...' : 'Ingresar'}
           </button>
+
+          <div className="text-center">
+            <Link
+              to="/forgot-password"
+              className="text-sm text-gray-500 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400"
+            >
+              ¿Olvidaste tu contraseña?
+            </Link>
+          </div>
         </form>
       </div>
     </div>
