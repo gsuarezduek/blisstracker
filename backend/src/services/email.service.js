@@ -16,9 +16,9 @@ async function sendPasswordReset(email, name, resetUrl) {
 
   const transporter = nodemailer.createTransport({
     host,
-    port: 465,
-    secure: true,
-    tls: { servername: SMTP_HOST }, // valida el certificado con el hostname real
+    port: 587,
+    secure: false,
+    tls: { servername: SMTP_HOST },
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
