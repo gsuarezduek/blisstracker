@@ -122,6 +122,9 @@ function UserCard({ entry, now }) {
         <div className="flex gap-4">
           <span>✓ <strong className="text-gray-700 dark:text-gray-300">{stats.completed}</strong> completadas</span>
           <span>⏳ <strong className="text-gray-700 dark:text-gray-300">{stats.pending}</strong> pendientes</span>
+          {stats.blocked > 0 && (
+            <span>⚠ <strong className="text-red-600 dark:text-red-400">{stats.blocked}</strong> bloqueadas</span>
+          )}
         </div>
         <span className="font-medium text-gray-600 dark:text-gray-400">{fmtMins(stats.totalMinutes)} registradas</span>
       </div>

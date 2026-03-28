@@ -41,6 +41,7 @@ async function snapshot(req, res, next) {
           total: wd.tasks.length,
           completed: completedCount,
           pending: wd.tasks.filter(t => t.status === 'PENDING').length,
+          blocked: wd.tasks.filter(t => t.status === 'BLOCKED').length,
           totalMinutes: totalMins,
         },
       }
