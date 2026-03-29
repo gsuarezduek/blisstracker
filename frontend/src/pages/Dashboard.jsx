@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import TaskCard from '../components/TaskCard'
 import AddTaskModal from '../components/AddTaskModal'
+import InactivityModal from '../components/InactivityModal'
+import { useInactivity } from '../hooks/useInactivity'
 import api from '../api/client'
 import { useAuth } from '../context/AuthContext'
 
@@ -19,12 +21,23 @@ export default function Dashboard() {
   const [elapsed, setElapsed] = useState('')
 
   const [carryOver, setCarryOver] = useState([])
+  const [autoPausedTask, setAutoPausedTask] = useState(null)
 
   const loadToday = useCallback(async () => {
     const { data } = await api.get('/workdays/today')
     const { carryOverTasks, ...wd } = data
     setWorkDay(wd)
     setCarryOver(carryOverTasks ?? [])
+
+    // Restore auto-paused modal if task was paused by inactivity detection
+    const storedId = localStorage.getItem('autoPaused')
+    if (storedId) {
+      const taskId = Number(storedId)
+      const allTasks = [...(wd.tasks ?? []), ...(carryOverTasks ?? [])]
+      const task = allTasks.find(t => t.id === taskId && t.status === 'PAUSED')
+      if (task) setAutoPausedTask(task)
+      else localStorage.removeItem('autoPaused')
+    }
   }, [])
 
   useEffect(() => { loadToday() }, [loadToday])
@@ -82,6 +95,62 @@ export default function Dashboard() {
   }
 
   const tasks = workDay?.tasks ?? []
+  const activeTask = tasks.find(t => t.status === 'IN_PROGRESS')
+    ?? carryOver.find(t => t.status === 'IN_PROGRESS')
+    ?? null
+
+  // Inactivity detection for the active task
+  async function handleAutoPause() {
+    const task = activeTask
+    if (!task) return
+    try {
+      const { data } = await api.patch(`/tasks/${task.id}/pause`)
+      handleUpdateTask(data)
+      localStorage.setItem('autoPaused', String(task.id))
+      setAutoPausedTask(data)
+    } catch (_) {}
+  }
+
+  const { showWarning, secondsLeft, dismiss } = useInactivity({
+    activeTask,
+    onAutoPause: handleAutoPause,
+  })
+
+  async function handlePauseFromWarning() {
+    const task = activeTask
+    if (!task) { dismiss(); return }
+    dismiss()
+    try {
+      const { data } = await api.patch(`/tasks/${task.id}/pause`)
+      handleUpdateTask(data)
+      localStorage.setItem('autoPaused', String(task.id))
+      setAutoPausedTask(data)
+    } catch (_) {}
+  }
+
+  function clearAutoPaused() {
+    localStorage.removeItem('autoPaused')
+    setAutoPausedTask(null)
+  }
+
+  async function handleResumeAutoPaused() {
+    if (!autoPausedTask) return
+    try {
+      const { data } = await api.patch(`/tasks/${autoPausedTask.id}/resume`)
+      handleUpdateTask(data)
+    } catch (_) {}
+    clearAutoPaused()
+  }
+
+  async function handleCompleteAutoPaused() {
+    if (!autoPausedTask) return
+    try {
+      const { data } = await api.patch(`/tasks/${autoPausedTask.id}/complete`)
+      handleUpdateTask(data)
+    } catch (_) {}
+    clearAutoPaused()
+  }
+
   const pending    = tasks.filter(t => t.status === 'PENDING')
   const inProgress = tasks.filter(t => t.status === 'IN_PROGRESS')
   const paused     = tasks.filter(t => t.status === 'PAUSED')
@@ -236,6 +305,16 @@ export default function Dashboard() {
       </main>
 
       {showModal && <AddTaskModal onAdd={handleAddTask} onClose={() => setShowModal(false)} />}
+
+      <InactivityModal
+        phase={autoPausedTask ? 'auto_paused' : showWarning ? 'warning' : null}
+        secondsLeft={secondsLeft}
+        taskDescription={autoPausedTask?.description ?? activeTask?.description}
+        onDismiss={autoPausedTask ? clearAutoPaused : dismiss}
+        onPause={handlePauseFromWarning}
+        onResume={handleResumeAutoPaused}
+        onComplete={handleCompleteAutoPaused}
+      />
     </div>
   )
 }
