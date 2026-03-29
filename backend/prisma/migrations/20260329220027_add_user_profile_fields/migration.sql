@@ -1,0 +1,15 @@
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN     "address" TEXT,
+ADD COLUMN     "alias" TEXT,
+ADD COLUMN     "birthday" TIMESTAMP(3),
+ADD COLUMN     "bloodType" TEXT,
+ADD COLUMN     "children" INTEGER,
+ADD COLUMN     "cuit" TEXT,
+ADD COLUMN     "dni" TEXT,
+ADD COLUMN     "educationLevel" TEXT,
+ADD COLUMN     "educationTitle" TEXT,
+ADD COLUMN     "emergencyContact" TEXT,
+ADD COLUMN     "healthInsurance" TEXT,
+ADD COLUMN     "maritalStatus" TEXT,
+ADD COLUMN     "medicalConditions" TEXT,
+ADD COLUMN     "phone" TEXT;

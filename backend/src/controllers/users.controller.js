@@ -7,7 +7,12 @@ const prisma = new PrismaClient()
 async function list(req, res, next) {
   try {
     const users = await prisma.user.findMany({
-      select: { id: true, name: true, email: true, role: true, active: true, createdAt: true },
+      select: {
+        id: true, name: true, email: true, role: true, active: true, createdAt: true,
+        phone: true, birthday: true, address: true, dni: true, cuit: true, alias: true,
+        maritalStatus: true, children: true, educationLevel: true, educationTitle: true,
+        bloodType: true, medicalConditions: true, healthInsurance: true, emergencyContact: true,
+      },
       orderBy: { name: 'asc' },
     })
     res.json(users)

@@ -32,6 +32,22 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Datos personales (opcionales)
+  phone            String?
+  birthday         DateTime?
+  address          String?
+  dni              String?
+  cuit             String?
+  alias            String?
+  maritalStatus    String?
+  children         Int?
+  educationLevel   String?
+  educationTitle   String?
+  bloodType        String?
+  medicalConditions String?
+  healthInsurance  String?
+  emergencyContact String?
+
   workDays      WorkDay[]
   tasks         Task[]
   tasksCreated  Task[]         @relation("TaskCreatedBy")

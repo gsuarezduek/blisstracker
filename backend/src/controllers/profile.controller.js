@@ -1,0 +1,83 @@
+const bcrypt = require('bcryptjs')
+const { PrismaClient } = require('@prisma/client')
+const prisma = new PrismaClient()
+
+const PERSONAL_FIELDS = [
+  'phone', 'birthday', 'address', 'dni', 'cuit', 'alias',
+  'maritalStatus', 'children', 'educationLevel', 'educationTitle',
+  'bloodType', 'medicalConditions', 'healthInsurance', 'emergencyContact',
+]
+
+async function getProfile(req, res, next) {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: {
+        id: true, name: true, email: true, role: true,
+        createdAt: true,
+        phone: true, birthday: true, address: true, dni: true,
+        cuit: true, alias: true, maritalStatus: true, children: true,
+        educationLevel: true, educationTitle: true, bloodType: true,
+        medicalConditions: true, healthInsurance: true, emergencyContact: true,
+      },
+    })
+    res.json(user)
+  } catch (err) { next(err) }
+}
+
+async function updateProfile(req, res, next) {
+  try {
+    const data = {}
+    for (const field of PERSONAL_FIELDS) {
+      if (field in req.body) {
+        if (field === 'birthday') {
+          data.birthday = req.body.birthday ? new Date(req.body.birthday) : null
+        } else if (field === 'children') {
+          data.children = req.body.children !== '' && req.body.children !== null
+            ? Number(req.body.children)
+            : null
+        } else {
+          data[field] = req.body[field] || null
+        }
+      }
+    }
+
+    const user = await prisma.user.update({
+      where: { id: req.user.id },
+      data,
+      select: {
+        id: true, name: true, email: true, role: true,
+        createdAt: true,
+        phone: true, birthday: true, address: true, dni: true,
+        cuit: true, alias: true, maritalStatus: true, children: true,
+        educationLevel: true, educationTitle: true, bloodType: true,
+        medicalConditions: true, healthInsurance: true, emergencyContact: true,
+      },
+    })
+    res.json(user)
+  } catch (err) { next(err) }
+}
+
+async function changePassword(req, res, next) {
+  try {
+    const { currentPassword, newPassword } = req.body
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Datos incompletos' })
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' })
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } })
+    const valid = await bcrypt.compare(currentPassword, user.password)
+    if (!valid) {
+      return res.status(400).json({ error: 'La contraseña actual es incorrecta' })
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 10)
+    await prisma.user.update({ where: { id: req.user.id }, data: { password: hashed } })
+    res.json({ message: 'Contraseña actualizada correctamente' })
+  } catch (err) { next(err) }
+}
+
+module.exports = { getProfile, updateProfile, changePassword }

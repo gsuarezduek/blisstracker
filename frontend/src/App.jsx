@@ -12,6 +12,7 @@ import MyProjects from './pages/MyProjects'
 import ProjectDetail from './pages/ProjectDetail'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
+import MyProfile from './pages/MyProfile'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -41,6 +42,7 @@ export default function App() {
           <Route path="/my-reports"  element={<PrivateRoute><MyReports  /></PrivateRoute>} />
           <Route path="/my-projects" element={<PrivateRoute><MyProjects /></PrivateRoute>} />
           <Route path="/my-projects/:id" element={<PrivateRoute><ProjectDetail /></PrivateRoute>} />
+          <Route path="/profile" element={<PrivateRoute><MyProfile /></PrivateRoute>} />
           <Route path="/realtime" element={<AdminRoute><RealTime /></AdminRoute>} />
           <Route path="/reports" element={<AdminRoute><Reports /></AdminRoute>} />
           <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />

@@ -92,10 +92,10 @@ export default function Navbar() {
             </button>
 
             {/* User info — desktop only */}
-            <div className="hidden md:block text-right">
+            <Link to="/profile" className="hidden md:block text-right hover:opacity-80 transition-opacity">
               <p className="text-sm font-medium text-gray-900 dark:text-white leading-tight">{user?.name}</p>
               <p className="text-xs text-gray-500 dark:text-gray-400">{labelFor(user?.role)}</p>
-            </div>
+            </Link>
 
             {/* Logout — desktop only */}
             <button
@@ -128,10 +128,17 @@ export default function Navbar() {
         {menuOpen && (
           <div className="md:hidden border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 space-y-1">
             {/* User info */}
-            <div className="pb-3 mb-2 border-b border-gray-100 dark:border-gray-700">
-              <p className="text-sm font-semibold text-gray-900 dark:text-white">{user?.name}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">{labelFor(user?.role)}</p>
-            </div>
+            <Link
+              to="/profile"
+              onClick={closeMenu}
+              className="flex items-center justify-between pb-3 mb-2 border-b border-gray-100 dark:border-gray-700 group"
+            >
+              <div>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">{user?.name}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{labelFor(user?.role)}</p>
+              </div>
+              <span className="text-xs text-gray-400 dark:text-gray-500 group-hover:text-primary-500 transition-colors">Mi perfil →</span>
+            </Link>
 
             {/* Nav links */}
             {links.map(l => (
