@@ -111,41 +111,21 @@ export default function Dashboard() {
     } catch (_) {}
   }
 
-  const { showWarning, secondsLeft, dismiss } = useInactivity({
+  const { dismiss } = useInactivity({
     activeTask,
     onAutoPause: handleAutoPause,
   })
 
-  async function handlePauseFromWarning() {
-    const task = activeTask
-    if (!task) { dismiss(); return }
-    dismiss()
-    try {
-      const { data } = await api.patch(`/tasks/${task.id}/pause`)
-      handleUpdateTask(data)
-      localStorage.setItem('autoPaused', String(task.id))
-      setAutoPausedTask(data)
-    } catch (_) {}
-  }
-
   function clearAutoPaused() {
     localStorage.removeItem('autoPaused')
     setAutoPausedTask(null)
+    dismiss()
   }
 
   async function handleResumeAutoPaused() {
     if (!autoPausedTask) return
     try {
       const { data } = await api.patch(`/tasks/${autoPausedTask.id}/resume`)
-      handleUpdateTask(data)
-    } catch (_) {}
-    clearAutoPaused()
-  }
-
-  async function handleCompleteAutoPaused() {
-    if (!autoPausedTask) return
-    try {
-      const { data } = await api.patch(`/tasks/${autoPausedTask.id}/complete`)
       handleUpdateTask(data)
     } catch (_) {}
     clearAutoPaused()
@@ -307,13 +287,10 @@ export default function Dashboard() {
       {showModal && <AddTaskModal onAdd={handleAddTask} onClose={() => setShowModal(false)} />}
 
       <InactivityModal
-        phase={autoPausedTask ? 'auto_paused' : showWarning ? 'warning' : null}
-        secondsLeft={secondsLeft}
-        taskDescription={autoPausedTask?.description ?? activeTask?.description}
-        onDismiss={autoPausedTask ? clearAutoPaused : dismiss}
-        onPause={handlePauseFromWarning}
+        phase={autoPausedTask ? 'auto_paused' : null}
+        taskDescription={autoPausedTask?.description}
+        onDismiss={clearAutoPaused}
         onResume={handleResumeAutoPaused}
-        onComplete={handleCompleteAutoPaused}
       />
     </div>
   )
