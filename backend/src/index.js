@@ -24,13 +24,22 @@ const app = express()
 // Security headers
 app.use(helmet())
 
-// CORS — only allow the configured frontend origin
+// CORS — only allow the configured frontend origin(s)
+// FRONTEND_URL supports a single origin or comma-separated list, trailing slashes are stripped
+const allowedOrigins = (process.env.FRONTEND_URL || '')
+  .split(',')
+  .map(o => o.trim().replace(/\/$/, ''))
+  .filter(Boolean)
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL,
+  origin: allowedOrigins.length === 1 ? allowedOrigins[0] : allowedOrigins,
   credentials: true,
 }))
 
 app.use(express.json({ limit: '100kb' }))
+
+// Trust Railway's reverse proxy so express-rate-limit reads the real client IP
+app.set('trust proxy', 1)
 
 // Rate limiting on auth endpoints
 const loginLimiter = rateLimit({
