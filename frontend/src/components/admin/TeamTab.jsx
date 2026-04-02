@@ -95,7 +95,14 @@ export default function TeamTab() {
 
   return (
     <div>
-      <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">{editId ? 'Editar miembro' : 'Agregar miembro del equipo'}</h2>
+      <div className="flex items-center gap-2 mb-4">
+        <h2 className="text-lg font-bold text-gray-900 dark:text-white">{editId ? 'Editar miembro' : 'Equipo'}</h2>
+        {!editId && users.length > 0 && (
+          <span className="text-sm bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-full px-2.5 py-0.5 font-medium">
+            {users.filter(u => u.active).length} miembros
+          </span>
+        )}
+      </div>
 
       <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl p-4 mb-6 grid grid-cols-2 gap-3">
         <div>

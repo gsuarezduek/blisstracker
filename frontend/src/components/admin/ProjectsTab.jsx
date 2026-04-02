@@ -80,36 +80,36 @@ function TeamModal({ project, allUsers, onClose, onUpdate }) {
                 </svg>
               </button>
             )}
-          </div>
 
-          {/* Search results */}
-          {query && (
-            <div className="border border-gray-200 dark:border-gray-600 rounded-xl overflow-hidden">
-              {suggestions.length === 0 ? (
-                <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-4">
-                  {allUsers.filter(u => !memberIds.has(u.id)).length === 0
-                    ? 'Todos los usuarios ya están en este proyecto'
-                    : 'No se encontraron resultados'}
-                </p>
-              ) : (
-                suggestions.map(u => (
-                  <div key={u.id} className="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-700 border-b dark:border-gray-600 last:border-b-0 transition-colors">
-                    <div>
-                      <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{u.name}</p>
-                      <p className="text-xs text-gray-400 dark:text-gray-500">{labelFor(u.role)}</p>
+            {/* Search results — absolute dropdown so it overlays the members list */}
+            {query && (
+              <div className="absolute left-0 right-0 top-full mt-1 z-10 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl shadow-lg overflow-hidden max-h-52 overflow-y-auto">
+                {suggestions.length === 0 ? (
+                  <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-4">
+                    {allUsers.filter(u => !memberIds.has(u.id)).length === 0
+                      ? 'Todos los usuarios ya están en este proyecto'
+                      : 'No se encontraron resultados'}
+                  </p>
+                ) : (
+                  suggestions.map(u => (
+                    <div key={u.id} className="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-700 border-b dark:border-gray-600 last:border-b-0 transition-colors">
+                      <div>
+                        <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{u.name}</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500">{labelFor(u.role)}</p>
+                      </div>
+                      <button
+                        onClick={() => addUser(u)}
+                        disabled={saving}
+                        className="text-xs font-medium bg-primary-600 hover:bg-primary-700 text-white px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 flex-shrink-0 ml-3"
+                      >
+                        + Agregar
+                      </button>
                     </div>
-                    <button
-                      onClick={() => addUser(u)}
-                      disabled={saving}
-                      className="text-xs font-medium bg-primary-600 hover:bg-primary-700 text-white px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 flex-shrink-0 ml-3"
-                    >
-                      + Agregar
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
+                  ))
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Current members */}
           <div>
@@ -261,7 +261,14 @@ export default function ProjectsTab() {
 
   return (
     <div>
-      <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Proyectos / Clientes</h2>
+      <div className="flex items-center gap-2 mb-4">
+        <h2 className="text-lg font-bold text-gray-900 dark:text-white">Proyectos / Clientes</h2>
+        {projects.length > 0 && (
+          <span className="text-sm bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-full px-2.5 py-0.5 font-medium">
+            {projects.filter(p => p.active).length} activos
+          </span>
+        )}
+      </div>
 
       {/* Create form */}
       <form onSubmit={handleCreate} className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl p-4 mb-6 space-y-3">

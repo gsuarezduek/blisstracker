@@ -26,6 +26,7 @@ export default function TaskCard({ task, onUpdate, onDelete, hasActiveTask }) {
   const [loading, setLoading] = useState(false)
   const [showBlockForm, setShowBlockForm] = useState(false)
   const [blockReason, setBlockReason] = useState('')
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const blockInputRef = useRef(null)
 
   useEffect(() => {
@@ -43,9 +44,14 @@ export default function TaskCard({ task, onUpdate, onDelete, hasActiveTask }) {
   }
 
   async function handleDelete() {
-    if (!confirm('¿Eliminar tarea?')) return
-    await api.delete(`/tasks/${task.id}`)
-    onDelete(task.id)
+    setLoading(true)
+    try {
+      await api.delete(`/tasks/${task.id}`)
+      onDelete(task.id)
+    } finally {
+      setLoading(false)
+      setShowDeleteConfirm(false)
+    }
   }
 
   async function handleBlock() {
@@ -94,7 +100,19 @@ export default function TaskCard({ task, onUpdate, onDelete, hasActiveTask }) {
     : 'dark:border-gray-700'
 
   return (
-    <div className={`bg-white dark:bg-gray-800 rounded-xl border p-4 flex flex-col gap-3 transition-opacity ${task.status === 'COMPLETED' ? 'opacity-70' : ''} ${borderClass}`}>
+    <div className={`relative bg-white dark:bg-gray-800 rounded-xl border p-4 flex flex-col gap-3 transition-opacity ${task.status === 'COMPLETED' ? 'opacity-70' : ''} ${borderClass}`}>
+
+      {/* Delete button — top-right corner, only for PENDING tasks */}
+      {task.status === 'PENDING' && (
+        <button
+          onClick={() => setShowDeleteConfirm(true)}
+          title="Eliminar tarea"
+          className="absolute -top-2.5 -right-2.5 w-5 h-5 flex items-center justify-center rounded-full text-gray-400 dark:text-gray-500 hover:text-red-400 dark:hover:text-red-400 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-red-300 dark:hover:border-red-700 transition-colors text-xs leading-none shadow-sm"
+        >
+          ×
+        </button>
+      )}
+
       {/* Main row */}
       <div className="flex items-start gap-4">
         {/* Status dot */}
@@ -127,21 +145,18 @@ export default function TaskCard({ task, onUpdate, onDelete, hasActiveTask }) {
 
         <div className="flex flex-col gap-1.5 flex-shrink-0 w-24">
           {task.status === 'PENDING' && (
-            <>
-              <button
-                onClick={() => call('start')}
-                disabled={loading || !canStart}
-                title={hasActiveTask ? 'Pausá o completá la tarea en curso primero' : ''}
-                className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-40 ${
-                  canStart
-                    ? 'bg-blue-500 hover:bg-blue-600 text-white'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
-                }`}
-              >
-                Iniciar
-              </button>
-              <button onClick={handleDelete} className="text-gray-300 dark:text-gray-600 hover:text-red-400 dark:hover:text-red-400 transition-colors text-lg leading-none">×</button>
-            </>
+            <button
+              onClick={() => call('start')}
+              disabled={loading || !canStart}
+              title={hasActiveTask ? 'Pausá o completá la tarea en curso primero' : ''}
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-40 ${
+                canStart
+                  ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+              }`}
+            >
+              Iniciar
+            </button>
           )}
 
           {task.status === 'IN_PROGRESS' && (
@@ -230,6 +245,35 @@ export default function TaskCard({ task, onUpdate, onDelete, hasActiveTask }) {
             >
               Cancelar
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirmation modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-sm p-6 flex flex-col gap-4">
+            <div className="flex flex-col gap-1">
+              <h3 className="text-base font-bold text-gray-900 dark:text-white">Eliminar tarea</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2">"{task.description}"</p>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Esta acción no se puede deshacer.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={loading}
+                className="flex-1 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-xl py-2.5 text-sm font-medium transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={loading}
+                className="flex-1 bg-red-500 hover:bg-red-600 text-white rounded-xl py-2.5 text-sm font-medium transition-colors disabled:opacity-60"
+              >
+                {loading ? 'Eliminando...' : 'Eliminar'}
+              </button>
+            </div>
           </div>
         </div>
       )}
