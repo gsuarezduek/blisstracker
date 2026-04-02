@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client')
-const prisma = new PrismaClient()
+const prisma = require('../lib/prisma')
 
 const includeDetails = {
   services: { include: { service: true }, orderBy: { service: { name: 'asc' } } },

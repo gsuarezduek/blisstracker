@@ -1,20 +1,37 @@
-const { PrismaClient } = require('@prisma/client')
-const prisma = new PrismaClient()
+const prisma = require('../lib/prisma')
 
 function calcMins(t) {
   if (t.minutesOverride !== null && t.minutesOverride !== undefined) return t.minutesOverride
   return Math.max(0, Math.round((new Date(t.completedAt) - new Date(t.startedAt)) / 60000) - (t.pausedMinutes || 0))
 }
 
+// Default fallback: last 90 days in Buenos Aires timezone
+function defaultDateRange() {
+  const tz = 'America/Argentina/Buenos_Aires'
+  const to = new Date().toLocaleDateString('en-CA', { timeZone: tz })
+  const d = new Date()
+  d.setDate(d.getDate() - 90)
+  const from = d.toLocaleDateString('en-CA', { timeZone: tz })
+  return { from, to }
+}
+
+function buildDateWhere(from, to) {
+  const range = {}
+  if (from) range.gte = from
+  if (to)   range.lte = to
+  return { date: range }
+}
+
 // Returns time per project within a date range
 async function byProject(req, res, next) {
   try {
-    const { from, to } = req.query
-    const where = { status: 'COMPLETED', startedAt: { not: null }, completedAt: { not: null } }
-    if (from || to) {
-      where.workDay = {}
-      if (from) where.workDay.date = { gte: from }
-      if (to) where.workDay.date = { ...where.workDay.date, lte: to }
+    let { from, to } = req.query
+    if (!from && !to) ({ from, to } = defaultDateRange())
+    const where = {
+      status: 'COMPLETED',
+      startedAt: { not: null },
+      completedAt: { not: null },
+      workDay: buildDateWhere(from, to),
     }
 
     const tasks = await prisma.task.findMany({
@@ -49,14 +66,15 @@ async function byProject(req, res, next) {
 // Returns daily summary for a specific user (for admin detail view)
 async function byUser(req, res, next) {
   try {
-    const { userId, from, to } = req.query
-    const where = { status: 'COMPLETED', startedAt: { not: null }, completedAt: { not: null } }
-    if (userId) where.userId = Number(userId)
-    if (from || to) {
-      where.workDay = {}
-      if (from) where.workDay.date = { gte: from }
-      if (to) where.workDay.date = { ...where.workDay.date, lte: to }
+    let { userId, from, to } = req.query
+    if (!from && !to) ({ from, to } = defaultDateRange())
+    const where = {
+      status: 'COMPLETED',
+      startedAt: { not: null },
+      completedAt: { not: null },
+      workDay: buildDateWhere(from, to),
     }
+    if (userId) where.userId = Number(userId)
 
     const tasks = await prisma.task.findMany({
       where,
@@ -78,12 +96,13 @@ async function byUser(req, res, next) {
 // Returns all users with their tasks grouped by project
 async function byUserSummary(req, res, next) {
   try {
-    const { from, to } = req.query
-    const where = { status: 'COMPLETED', startedAt: { not: null }, completedAt: { not: null } }
-    if (from || to) {
-      where.workDay = {}
-      if (from) where.workDay.date = { gte: from }
-      if (to) where.workDay.date = { ...where.workDay.date, lte: to }
+    let { from, to } = req.query
+    if (!from && !to) ({ from, to } = defaultDateRange())
+    const where = {
+      status: 'COMPLETED',
+      startedAt: { not: null },
+      completedAt: { not: null },
+      workDay: buildDateWhere(from, to),
     }
 
     const tasks = await prisma.task.findMany({
@@ -120,17 +139,14 @@ async function byUserSummary(req, res, next) {
 // Returns the logged-in user's completed tasks grouped by project
 async function mine(req, res, next) {
   try {
-    const { from, to } = req.query
+    let { from, to } = req.query
+    if (!from && !to) ({ from, to } = defaultDateRange())
     const where = {
       userId: req.user.id,
       status: 'COMPLETED',
       startedAt: { not: null },
       completedAt: { not: null },
-    }
-    if (from || to) {
-      where.workDay = {}
-      if (from) where.workDay.date = { gte: from }
-      if (to) where.workDay.date = { ...where.workDay.date, lte: to }
+      workDay: buildDateWhere(from, to),
     }
 
     const tasks = await prisma.task.findMany({

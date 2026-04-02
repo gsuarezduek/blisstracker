@@ -136,6 +136,7 @@ model WorkDay {
   tasks Task[]
 
   @@unique([userId, date])
+  @@index([date])
 }
 
 model Notification {
@@ -151,6 +152,8 @@ model Notification {
   message   String                                      // ej: completó "Diseño logo" en Bliss
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Task {
@@ -175,4 +178,7 @@ model Task {
   updatedAt     DateTime   @updatedAt
 
   notifications Notification[]
+
+  @@index([userId, status])
+  @@index([projectId])
 }

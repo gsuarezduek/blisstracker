@@ -1,11 +1,9 @@
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
 const crypto = require('crypto')
-const { PrismaClient } = require('@prisma/client')
 const { sendPasswordReset } = require('../services/email.service')
 const { OAuth2Client } = require('google-auth-library')
-
-const prisma = new PrismaClient()
+const prisma = require('../lib/prisma')
 
 async function login(req, res, next) {
   try {
@@ -110,6 +108,9 @@ async function googleLogin(req, res, next) {
       audience: process.env.GOOGLE_CLIENT_ID,
     })
     const payload = ticket.getPayload()
+    if (!payload.email_verified) {
+      return res.status(401).json({ error: 'El email de Google no está verificado' })
+    }
     const email = payload.email
 
     const user = await prisma.user.findUnique({ where: { email } })

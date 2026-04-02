@@ -1,8 +1,9 @@
-const { PrismaClient } = require('@prisma/client')
-const prisma = new PrismaClient()
+const prisma = require('../lib/prisma')
+const { todayString } = require('../utils/dates')
 
-function todayString() {
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' })
+async function assertNoActiveTask(userId) {
+  const active = await prisma.task.findFirst({ where: { userId, status: 'IN_PROGRESS' } })
+  if (active) throw Object.assign(new Error('Ya tenés una tarea en curso. Pausala o completala primero.'), { status: 409 })
 }
 
 async function create(req, res, next) {
@@ -55,14 +56,7 @@ async function create(req, res, next) {
 async function startTask(req, res, next) {
   try {
     const userId = req.user.id
-
-    // Only one task can be IN_PROGRESS at a time
-    const active = await prisma.task.findFirst({
-      where: { userId, status: 'IN_PROGRESS' },
-    })
-    if (active) {
-      return res.status(409).json({ error: 'Ya tenés una tarea en curso. Pausala o completala primero.' })
-    }
+    await assertNoActiveTask(userId)
 
     const task = await prisma.task.update({
       where: { id: Number(req.params.id), userId },
@@ -93,14 +87,7 @@ async function pauseTask(req, res, next) {
 async function resumeTask(req, res, next) {
   try {
     const userId = req.user.id
-
-    // Only one task can be IN_PROGRESS at a time
-    const active = await prisma.task.findFirst({
-      where: { userId, status: 'IN_PROGRESS' },
-    })
-    if (active) {
-      return res.status(409).json({ error: 'Ya tenés una tarea en curso. Pausala o completala primero.' })
-    }
+    await assertNoActiveTask(userId)
 
     const current = await prisma.task.findUnique({
       where: { id: Number(req.params.id) },
@@ -185,13 +172,7 @@ async function blockTask(req, res, next) {
 async function unblockTask(req, res, next) {
   try {
     const userId = req.user.id
-
-    const active = await prisma.task.findFirst({
-      where: { userId, status: 'IN_PROGRESS' },
-    })
-    if (active) {
-      return res.status(409).json({ error: 'Ya tenés una tarea en curso. Pausala o completala primero.' })
-    }
+    await assertNoActiveTask(userId)
 
     const current = await prisma.task.findUnique({
       where: { id: Number(req.params.id) },

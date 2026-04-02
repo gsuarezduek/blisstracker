@@ -4,6 +4,7 @@ import { linkify } from '../utils/linkify'
 import api from '../api/client'
 import useRoles from '../hooks/useRoles'
 import UserTasksModal from '../components/UserTasksModal'
+import { fmtMins } from '../utils/format'
 
 const ROLE_COLORS_LIST = [
   'bg-purple-100 text-purple-700',
@@ -41,12 +42,6 @@ function elapsed(startedAt, now) {
   if (h > 0) return `${h}h ${m}m`
   if (m > 0) return `${m}m ${s}s`
   return `${s}s`
-}
-
-function fmtMins(mins) {
-  if (!mins) return '0m'
-  if (mins < 60) return `${mins}m`
-  return `${Math.floor(mins / 60)}h ${mins % 60}m`
 }
 
 function Avatar({ name }) {

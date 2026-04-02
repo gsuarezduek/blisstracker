@@ -1,11 +1,6 @@
 import { useState, useEffect } from 'react'
 import api from '../../api/client'
-
-function fmtMins(mins) {
-  if (mins === 0) return '0m'
-  if (mins < 60) return `${mins}m`
-  return `${Math.floor(mins / 60)}h ${mins % 60}m`
-}
+import { fmtMins } from '../../utils/format'
 
 function thisWeekRange() {
   const now = new Date()

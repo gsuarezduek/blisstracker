@@ -1,26 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import api from '../api/client'
 import { linkify } from '../utils/linkify'
-
-// Active minutes worked, excluding paused time
-function activeMinutes(task) {
-  if (!task.startedAt) return 0
-  const base = task.status === 'PAUSED' && task.pausedAt
-    ? new Date(task.pausedAt) - new Date(task.startedAt)
-    : Date.now()            - new Date(task.startedAt)
-  return Math.max(0, Math.round(base / 60000) - (task.pausedMinutes || 0))
-}
-
-function fmtMins(mins) {
-  if (mins < 60) return `${mins}m`
-  return `${Math.floor(mins / 60)}h ${mins % 60}m`
-}
-
-function completedDuration(task) {
-  if (!task.startedAt || !task.completedAt) return null
-  const mins = Math.max(0, Math.round((new Date(task.completedAt) - new Date(task.startedAt)) / 60000) - (task.pausedMinutes || 0))
-  return fmtMins(mins)
-}
+import { fmtMins, activeMinutes, completedDuration } from '../utils/format'
 
 export default function TaskCard({ task, onUpdate, onDelete, hasActiveTask }) {
   const [loading, setLoading] = useState(false)

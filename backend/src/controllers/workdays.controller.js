@@ -1,9 +1,5 @@
-const { PrismaClient } = require('@prisma/client')
-const prisma = new PrismaClient()
-
-function todayString() {
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' })
-}
+const prisma = require('../lib/prisma')
+const { todayString } = require('../utils/dates')
 
 async function getOrCreateToday(req, res, next) {
   try {

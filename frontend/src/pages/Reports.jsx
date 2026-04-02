@@ -5,13 +5,7 @@ import DateRangeFilter from '../components/DateRangeFilter'
 import EditDurationModal from '../components/EditDurationModal'
 import api from '../api/client'
 import useRoles from '../hooks/useRoles'
-
-function fmtMins(mins) {
-  if (!mins || mins === 0) return '0m'
-  if (mins < 60) return `${mins}m`
-  return `${Math.floor(mins / 60)}h ${mins % 60}m`
-}
-
+import { fmtMins } from '../utils/format'
 
 // ── By Project View ────────────────────────────────────────────────────────────
 
@@ -249,11 +243,12 @@ export default function Reports() {
   const [loading, setLoading] = useState(false)
   const [editingTask, setEditingTask] = useState(null)
   const [from, setFrom] = useState(() => {
+    const tz = 'America/Argentina/Buenos_Aires'
     const now = new Date(); const day = now.getDay() || 7
     const mon = new Date(now); mon.setDate(now.getDate() - day + 1)
-    return mon.toLocaleDateString('en-CA')
+    return mon.toLocaleDateString('en-CA', { timeZone: tz })
   })
-  const [to, setTo] = useState(() => new Date().toLocaleDateString('en-CA'))
+  const [to, setTo] = useState(() => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }))
 
   async function loadReport(f = from, t = to) {
     setLoading(true)
