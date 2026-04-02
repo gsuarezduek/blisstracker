@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { GoogleOAuthProvider } from '@react-oauth/google'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import Login from './pages/Login'
@@ -30,6 +31,7 @@ function AdminRoute({ children }) {
 
 export default function App() {
   return (
+    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
     <ThemeProvider>
     <AuthProvider>
       <BrowserRouter>
@@ -51,5 +53,6 @@ export default function App() {
       </BrowserRouter>
     </AuthProvider>
     </ThemeProvider>
+    </GoogleOAuthProvider>
   )
 }

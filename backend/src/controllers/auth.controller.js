@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken')
 const crypto = require('crypto')
 const { PrismaClient } = require('@prisma/client')
 const { sendPasswordReset } = require('../services/email.service')
+const { OAuth2Client } = require('google-auth-library')
 
 const prisma = new PrismaClient()
 
@@ -98,4 +99,37 @@ async function resetPassword(req, res, next) {
   }
 }
 
-module.exports = { login, me, forgotPassword, resetPassword }
+async function googleLogin(req, res, next) {
+  try {
+    const { credential } = req.body
+    if (!credential) return res.status(400).json({ error: 'Token de Google requerido' })
+
+    const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
+    const ticket = await client.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    })
+    const payload = ticket.getPayload()
+    const email = payload.email
+
+    const user = await prisma.user.findUnique({ where: { email } })
+    if (!user || !user.active) {
+      return res.status(404).json({ error: 'No existe una cuenta activa con ese email de Google' })
+    }
+
+    const token = jwt.sign(
+      { id: user.id, role: user.role, name: user.name, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: '12h' }
+    )
+
+    res.json({
+      token,
+      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
+module.exports = { login, me, forgotPassword, resetPassword, googleLogin }

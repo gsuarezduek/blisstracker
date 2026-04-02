@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, Link, useSearchParams } from 'react-router-dom'
+import { GoogleLogin } from '@react-oauth/google'
 import { useAuth } from '../context/AuthContext'
 
 const guide = [
@@ -161,7 +162,7 @@ export default function Login2() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const { login, user } = useAuth()
+  const { login, loginWithGoogle, user } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const resetOk = searchParams.get('reset') === 'ok'
@@ -243,6 +244,33 @@ export default function Login2() {
             >
               {loading ? 'Ingresando...' : 'Ingresar'}
             </button>
+
+            <div className="flex items-center gap-3">
+              <div className="flex-1 border-t border-gray-200 dark:border-gray-700" />
+              <span className="text-xs text-gray-400 dark:text-gray-500">o</span>
+              <div className="flex-1 border-t border-gray-200 dark:border-gray-700" />
+            </div>
+
+            <div className="flex justify-center">
+              <GoogleLogin
+                onSuccess={async ({ credential }) => {
+                  setError('')
+                  setLoading(true)
+                  try {
+                    await loginWithGoogle(credential)
+                    navigate('/', { replace: true })
+                  } catch (err) {
+                    setError(err.response?.data?.error || 'No se pudo iniciar sesión con Google')
+                  } finally {
+                    setLoading(false)
+                  }
+                }}
+                onError={() => setError('No se pudo iniciar sesión con Google')}
+                useOneTap={false}
+                text="continue_with"
+                locale="es"
+              />
+            </div>
 
             <div className="text-center">
               <Link
