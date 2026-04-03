@@ -141,6 +141,7 @@ async function completeTask(req, res, next) {
           actorId:   userId,
           taskId:    task.id,
           projectId: task.projectId,
+          type:      'COMPLETED',
           message:   `completó "${desc}" en ${task.project.name}`,
         })),
       })
@@ -155,13 +156,36 @@ async function completeTask(req, res, next) {
 
 async function blockTask(req, res, next) {
   try {
+    const userId = req.user.id
     const { reason } = req.body
     if (!reason?.trim()) return res.status(400).json({ error: 'La razón del bloqueo es requerida' })
     const task = await prisma.task.update({
-      where: { id: Number(req.params.id), userId: req.user.id },
+      where: { id: Number(req.params.id), userId },
       data: { status: 'BLOCKED', blockedReason: reason.trim(), pausedAt: new Date() },
       include: { project: true, createdBy: { select: { id: true, name: true } } },
     })
+
+    // Notificar a todos los miembros del proyecto
+    const members = await prisma.projectMember.findMany({
+      where: { projectId: task.projectId, userId: { not: userId } },
+      select: { userId: true },
+    })
+    if (members.length > 0) {
+      const desc = task.description.length > 60
+        ? task.description.slice(0, 57) + '...'
+        : task.description
+      await prisma.notification.createMany({
+        data: members.map(m => ({
+          userId:    m.userId,
+          actorId:   userId,
+          taskId:    task.id,
+          projectId: task.projectId,
+          type:      'BLOCKED',
+          message:   `bloqueó "${desc}" en ${task.project.name}`,
+        })),
+      })
+    }
+
     res.json(task)
   } catch (err) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'Tarea no encontrada' })

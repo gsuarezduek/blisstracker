@@ -5,7 +5,7 @@ async function list(req, res, next) {
   try {
     const notifications = await prisma.notification.findMany({
       where:   { userId: req.user.id },
-      include: { actor: { select: { id: true, name: true } }, project: { select: { id: true, name: true } } },
+      include: { actor: { select: { id: true, name: true, avatar: true } }, project: { select: { id: true, name: true } } },
       orderBy: { createdAt: 'desc' },
       take:    30,
     })

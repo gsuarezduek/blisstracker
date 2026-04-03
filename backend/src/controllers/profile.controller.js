@@ -9,7 +9,7 @@ const PERSONAL_FIELDS = [
 
 const PROFILE_SELECT = {
   id: true, name: true, email: true, role: true,
-  createdAt: true, avatar: true,
+  createdAt: true, avatar: true, weeklyEmailEnabled: true,
   phone: true, birthday: true, address: true, dni: true,
   cuit: true, alias: true, maritalStatus: true, children: true,
   educationLevel: true, educationTitle: true, bloodType: true,
@@ -91,4 +91,31 @@ async function changePassword(req, res, next) {
   } catch (err) { next(err) }
 }
 
-module.exports = { getProfile, updateProfile, changePassword, updateAvatar }
+async function updatePreferences(req, res, next) {
+  try {
+    const { weeklyEmailEnabled } = req.body
+    if (typeof weeklyEmailEnabled !== 'boolean') {
+      return res.status(400).json({ error: 'weeklyEmailEnabled debe ser un booleano' })
+    }
+    const user = await prisma.user.update({
+      where: { id: req.user.id },
+      data: { weeklyEmailEnabled },
+      select: { id: true, weeklyEmailEnabled: true },
+    })
+    res.json(user)
+  } catch (err) { next(err) }
+}
+
+async function sendTestWeeklyEmail(req, res, next) {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { id: true, name: true, email: true },
+    })
+    const { sendWeeklyReportForUser } = require('../services/weeklyReport.service')
+    await sendWeeklyReportForUser(user)
+    res.json({ ok: true, message: `Email enviado a ${user.email}` })
+  } catch (err) { next(err) }
+}
+
+module.exports = { getProfile, updateProfile, changePassword, updateAvatar, updatePreferences, sendTestWeeklyEmail }

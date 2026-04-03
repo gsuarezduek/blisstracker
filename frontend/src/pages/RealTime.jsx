@@ -188,7 +188,7 @@ export default function RealTime() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
               <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse inline-block" />
-              Tiempo Real
+              Actividad en tiempo real del equipo
             </h1>
             <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
               {new Date().toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}

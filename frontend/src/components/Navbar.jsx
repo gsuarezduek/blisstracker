@@ -43,7 +43,7 @@ export default function Navbar() {
     { to: '/', label: 'Dashboard' },
     { to: '/my-projects', label: 'Mis Proyectos' },
     ...(!isAdmin ? [{ to: '/my-reports', label: 'Mis Reportes' }] : []),
-    { to: '/realtime', label: 'Tiempo Real', dot: true },
+    { to: '/realtime', label: 'Actividad', dot: true },
     ...(isAdmin ? [
       { to: '/reports', label: 'Reportes' },
       { to: '/admin', label: 'Administración' },

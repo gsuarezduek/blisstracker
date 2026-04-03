@@ -91,31 +91,43 @@ export default function NotificationBell() {
                 <p className="text-sm">Sin notificaciones todavía</p>
               </div>
             ) : (
-              notifications.map(n => (
-                <div
-                  key={n.id}
-                  className={`px-4 py-3 border-b dark:border-gray-700 last:border-b-0 transition-colors ${
-                    !n.read ? 'bg-primary-50 dark:bg-primary-900/20' : 'bg-white dark:bg-gray-800'
-                  }`}
-                >
-                  <div className="flex items-start gap-2.5">
-                    {/* Actor avatar */}
-                    <div className="w-7 h-7 rounded-full bg-primary-500 text-white flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
-                      {n.actor.name.charAt(0).toUpperCase()}
+              notifications.map(n => {
+                const isBlocked = n.type === 'BLOCKED'
+                const bgClass = isBlocked
+                  ? (!n.read ? 'bg-red-100 dark:bg-red-900/40' : 'bg-red-50 dark:bg-red-900/20')
+                  : (!n.read ? 'bg-primary-50 dark:bg-primary-900/20' : 'bg-white dark:bg-gray-800')
+                const dotClass = isBlocked ? 'bg-red-500' : 'bg-primary-500'
+                const avatarClass = isBlocked ? 'bg-red-500' : 'bg-primary-500'
+                return (
+                  <div
+                    key={n.id}
+                    className={`px-4 py-3 border-b dark:border-gray-700 last:border-b-0 transition-colors ${bgClass}`}
+                  >
+                    <div className="flex items-start gap-2.5">
+                      <div className="relative flex-shrink-0 mt-0.5">
+                        <img
+                          src={`/perfiles/${n.actor.avatar ?? 'bee.png'}`}
+                          alt={n.actor.name}
+                          className="w-7 h-7 rounded-full object-cover border border-gray-200 dark:border-gray-600"
+                        />
+                        {isBlocked && (
+                          <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-red-500 rounded-full flex items-center justify-center text-white text-[8px] leading-none">⚠</span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm leading-snug ${isBlocked ? 'text-red-800 dark:text-red-200' : 'text-gray-800 dark:text-gray-200'}`}>
+                          <span className="font-semibold">{n.actor.name}</span>{' '}
+                          {n.message}
+                        </p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{timeAgo(n.createdAt)}</p>
+                      </div>
+                      {!n.read && (
+                        <span className={`w-2 h-2 rounded-full ${dotClass} flex-shrink-0 mt-1.5`} />
+                      )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-800 dark:text-gray-200 leading-snug">
-                        <span className="font-semibold">{n.actor.name}</span>{' '}
-                        {n.message}
-                      </p>
-                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{timeAgo(n.createdAt)}</p>
-                    </div>
-                    {!n.read && (
-                      <span className="w-2 h-2 rounded-full bg-primary-500 flex-shrink-0 mt-1.5" />
-                    )}
                   </div>
-                </div>
-              ))
+                )
+              })
             )}
           </div>
         </div>

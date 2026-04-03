@@ -57,4 +57,19 @@ async function sendWelcomeEmail(email, name) {
   if (error) throw new Error(error.message)
 }
 
-module.exports = { sendPasswordReset, sendWelcomeEmail }
+async function sendWeeklySummaryEmail(email, name, html, weekLabel) {
+  const subject = weekLabel
+    ? `Tu semana en Bliss — ${weekLabel}`
+    : 'Tu resumen semanal — Bliss Team Tracker'
+
+  const { error } = await resend.emails.send({
+    from: 'Bliss Team Tracker <gaston@blissmkt.ar>',
+    to: email,
+    subject,
+    html,
+  })
+
+  if (error) throw new Error(error.message)
+}
+
+module.exports = { sendPasswordReset, sendWelcomeEmail, sendWeeklySummaryEmail }
