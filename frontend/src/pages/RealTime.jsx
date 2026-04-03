@@ -44,14 +44,13 @@ function elapsed(startedAt, now) {
   return `${s}s`
 }
 
-function Avatar({ name }) {
-  const initials = name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase()
-  const colors = ['bg-indigo-500', 'bg-pink-500', 'bg-yellow-500', 'bg-green-500', 'bg-blue-500', 'bg-purple-500', 'bg-red-500', 'bg-cyan-500']
-  const color = colors[name.charCodeAt(0) % colors.length]
+function Avatar({ user }) {
   return (
-    <div className={`${color} text-white w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0`}>
-      {initials}
-    </div>
+    <img
+      src={`/perfiles/${user.avatar ?? 'bee.png'}`}
+      alt={user.name}
+      className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-gray-600 flex-shrink-0"
+    />
   )
 }
 
@@ -69,7 +68,7 @@ function UserCard({ entry, now }) {
       {/* User header */}
       <div className="flex items-center gap-3">
         <div className="relative">
-          <Avatar name={user.name} />
+          <Avatar user={user} />
           <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white dark:border-gray-800 ${
             !isActive ? 'bg-gray-300' :
             hasTask ? 'bg-blue-500 animate-pulse' : 'bg-green-400'
@@ -273,7 +272,7 @@ export default function RealTime() {
               {notStarted.map(user => (
                 <button key={user.id} className="text-left" onClick={() => setSelectedUser(user)}>
                   <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-100 dark:border-gray-700 opacity-50 p-5 flex items-center gap-3">
-                    <Avatar name={user.name} />
+                    <Avatar user={user} />
                     <div className="min-w-0">
                       <p className="font-semibold text-gray-900 dark:text-white truncate">{user.name}</p>
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${roleColor(user.role)}`}>

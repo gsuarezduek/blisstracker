@@ -21,15 +21,13 @@ const STATUS_CLASS = {
 
 const STATUS_ORDER = { BLOCKED: 0, IN_PROGRESS: 1, PAUSED: 2, PENDING: 3 }
 
-const AVATAR_COLORS = ['bg-indigo-500','bg-pink-500','bg-yellow-500','bg-green-500','bg-blue-500','bg-purple-500','bg-red-500','bg-cyan-500']
-
-function Avatar({ name }) {
-  const initials = name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase()
-  const color = AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length]
+function Avatar({ user }) {
   return (
-    <div className={`${color} text-white w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0`}>
-      {initials}
-    </div>
+    <img
+      src={`/perfiles/${user.avatar ?? 'bee.png'}`}
+      alt={user.name}
+      className="w-9 h-9 rounded-full object-cover border border-gray-200 dark:border-gray-600 flex-shrink-0"
+    />
   )
 }
 
@@ -113,7 +111,7 @@ export default function ProjectDetail() {
 
                     {/* User header */}
                     <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80">
-                      <Avatar name={user.name} />
+                      <Avatar user={user} />
                       <div className="min-w-0">
                         <p className="font-semibold text-gray-900 dark:text-white text-sm leading-tight">{user.name}</p>
                         <p className="text-xs text-gray-500 dark:text-gray-400">{labelFor(user.role)}</p>

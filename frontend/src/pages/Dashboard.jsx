@@ -131,12 +131,19 @@ export default function Dashboard() {
     clearAutoPaused()
   }
 
-  const pending    = tasks.filter(t => t.status === 'PENDING')
+  // Tareas destacadas: de hoy + carryOver, no completadas, no en curso, con estrella, ordenadas por nivel desc
+  const starred = [...tasks, ...carryOver]
+    .filter(t => (t.starred ?? 0) > 0 && t.status !== 'COMPLETED' && t.status !== 'IN_PROGRESS')
+    .sort((a, b) => (b.starred ?? 0) - (a.starred ?? 0))
+  const starredIds = new Set(starred.map(t => t.id))
+
+  // En curso incluye todas (starred o no). Las starred no-en-curso van solo a su sección.
   const inProgress = tasks.filter(t => t.status === 'IN_PROGRESS')
-  const paused     = tasks.filter(t => t.status === 'PAUSED')
-  const blocked    = tasks.filter(t => t.status === 'BLOCKED')
+  const pending    = tasks.filter(t => t.status === 'PENDING'  && !starredIds.has(t.id))
+  const paused     = tasks.filter(t => t.status === 'PAUSED'   && !starredIds.has(t.id))
+  const blocked    = tasks.filter(t => t.status === 'BLOCKED'  && !starredIds.has(t.id))
   const completed  = tasks.filter(t => t.status === 'COMPLETED')
-  const hasActiveTask = inProgress.length > 0 || carryOver.some(t => t.status === 'IN_PROGRESS')
+  const hasActiveTask = tasks.some(t => t.status === 'IN_PROGRESS') || carryOver.some(t => t.status === 'IN_PROGRESS')
 
   const totalMins = completed.reduce((acc, t) => {
     if (!t.startedAt || !t.completedAt) return acc
@@ -203,21 +210,7 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Carry-over tasks from previous days */}
-        {carryOver.length > 0 && (
-          <section className="mb-6">
-            <h2 className="text-xs font-semibold text-orange-500 uppercase tracking-wide mb-3 flex items-center gap-2">
-              <span>⏳</span> Pendientes de días anteriores
-            </h2>
-            <div className="space-y-2">
-              {carryOver.map(t => (
-                <TaskCard key={t.id} task={t} onUpdate={handleUpdateTask} onDelete={handleDeleteTask} hasActiveTask={hasActiveTask} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Task lists */}
+        {/* 1. En curso */}
         {inProgress.length > 0 && (
           <section className="mb-6">
             <h2 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">En curso</h2>
@@ -229,6 +222,45 @@ export default function Dashboard() {
           </section>
         )}
 
+        {/* 2. Destacadas (starred no-en-curso) */}
+        {starred.length > 0 && (
+          <section className="mb-6">
+            <h2 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">Destacadas</h2>
+            <div className="space-y-2">
+              {starred.map(t => (
+                <TaskCard key={`starred-${t.id}`} task={t} onUpdate={handleUpdateTask} onDelete={handleDeleteTask} hasActiveTask={hasActiveTask} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* 3. Carry-over de días anteriores (no starred) */}
+        {carryOver.some(t => !starredIds.has(t.id)) && (
+          <section className="mb-6">
+            <h2 className="text-xs font-semibold text-orange-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+              <span>⏳</span> Pendientes de días anteriores
+            </h2>
+            <div className="space-y-2">
+              {carryOver.filter(t => !starredIds.has(t.id)).map(t => (
+                <TaskCard key={t.id} task={t} onUpdate={handleUpdateTask} onDelete={handleDeleteTask} hasActiveTask={hasActiveTask} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* 4. Pausadas */}
+        {paused.length > 0 && (
+          <section className="mb-6">
+            <h2 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">Pausadas</h2>
+            <div className="space-y-2">
+              {paused.map(t => (
+                <TaskCard key={t.id} task={t} onUpdate={handleUpdateTask} onDelete={handleDeleteTask} hasActiveTask={hasActiveTask} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* 5. Bloqueadas */}
         {blocked.length > 0 && (
           <section className="mb-6">
             <h2 className="text-xs font-semibold text-red-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
@@ -242,17 +274,7 @@ export default function Dashboard() {
           </section>
         )}
 
-        {paused.length > 0 && (
-          <section className="mb-6">
-            <h2 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">Pausadas</h2>
-            <div className="space-y-2">
-              {paused.map(t => (
-                <TaskCard key={t.id} task={t} onUpdate={handleUpdateTask} onDelete={handleDeleteTask} hasActiveTask={hasActiveTask} />
-              ))}
-            </div>
-          </section>
-        )}
-
+        {/* 6. Pendientes */}
         {pending.length > 0 && (
           <section className="mb-6">
             <h2 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">Pendientes</h2>

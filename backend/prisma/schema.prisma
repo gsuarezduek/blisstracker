@@ -47,6 +47,7 @@ model User {
   medicalConditions String?
   healthInsurance  String?
   emergencyContact String?
+  avatar           String   @default("bee.png")
 
   workDays      WorkDay[]
   tasks         Task[]
@@ -174,6 +175,7 @@ model Task {
   pausedMinutes   Int        @default(0)
   completedAt     DateTime?
   minutesOverride Int?
+  starred         Int        @default(0)  // 0=sin estrella 1=amarillo 2=naranja 3=rojo
   createdAt       DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 

@@ -30,15 +30,21 @@ async function login(req, res, next) {
 
     res.json({
       token,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      user: { id: user.id, name: user.name, email: user.email, role: user.role, avatar: user.avatar },
     })
   } catch (err) {
     next(err)
   }
 }
 
-async function me(req, res) {
-  res.json(req.user)
+async function me(req, res, next) {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { id: true, name: true, email: true, role: true, avatar: true },
+    })
+    res.json(user)
+  } catch (err) { next(err) }
 }
 
 async function forgotPassword(req, res, next) {
@@ -126,7 +132,7 @@ async function googleLogin(req, res, next) {
 
     res.json({
       token,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      user: { id: user.id, name: user.name, email: user.email, role: user.role, avatar: user.avatar },
     })
   } catch (err) {
     next(err)

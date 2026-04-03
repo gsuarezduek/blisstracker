@@ -1,5 +1,5 @@
 const router = require('express').Router()
-const { create, startTask, pauseTask, resumeTask, completeTask, blockTask, unblockTask, remove, setDuration } = require('../controllers/tasks.controller')
+const { create, startTask, pauseTask, resumeTask, completeTask, blockTask, unblockTask, remove, setDuration, starTask } = require('../controllers/tasks.controller')
 const { auth, adminOnly } = require('../middleware/auth')
 
 router.use(auth)
@@ -10,6 +10,7 @@ router.patch('/:id/resume',   resumeTask)
 router.patch('/:id/complete', completeTask)
 router.patch('/:id/block',   blockTask)
 router.patch('/:id/unblock', unblockTask)
+router.patch('/:id/star',   starTask)
 router.delete('/:id', remove)
 router.patch('/:id/duration', adminOnly, setDuration)
 

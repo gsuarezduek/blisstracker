@@ -21,14 +21,13 @@ function roleColor(name) {
   return ROLE_COLORS_LIST[hash % ROLE_COLORS_LIST.length]
 }
 
-function Avatar({ name }) {
-  const initials = name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase()
-  const colors   = ['bg-indigo-500','bg-pink-500','bg-yellow-500','bg-green-500','bg-blue-500','bg-purple-500','bg-red-500','bg-cyan-500']
-  const color    = colors[name.charCodeAt(0) % colors.length]
+function Avatar({ user }) {
   return (
-    <div className={`${color} text-white w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0`}>
-      {initials}
-    </div>
+    <img
+      src={`/perfiles/${user.avatar ?? 'bee.png'}`}
+      alt={user.name}
+      className="w-8 h-8 rounded-full object-cover border border-gray-200 dark:border-gray-600 flex-shrink-0"
+    />
   )
 }
 
@@ -117,7 +116,7 @@ export default function MyProjects() {
                   <div className="flex flex-col gap-2">
                     {p.members.map(pm => (
                       <div key={pm.user.id} className="flex items-center gap-2.5">
-                        <Avatar name={pm.user.name} />
+                        <Avatar user={pm.user} />
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-gray-800 dark:text-gray-200 leading-tight">{pm.user.name}</p>
                           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${roleColor(pm.user.role)}`}>

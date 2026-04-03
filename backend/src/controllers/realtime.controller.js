@@ -9,7 +9,7 @@ async function snapshot(req, res, next) {
     const workDays = await prisma.workDay.findMany({
       where: { date },
       include: {
-        user: { select: { id: true, name: true, role: true } },
+        user: { select: { id: true, name: true, role: true, avatar: true } },
         tasks: {
           include: { project: true },
           orderBy: { updatedAt: 'desc' },
@@ -46,7 +46,7 @@ async function snapshot(req, res, next) {
     const workedIds = new Set(workDays.map(wd => wd.userId))
     const allUsers = await prisma.user.findMany({
       where: { active: true },
-      select: { id: true, name: true, role: true },
+      select: { id: true, name: true, role: true, avatar: true },
       orderBy: { name: 'asc' },
     })
     const notStarted = allUsers.filter(u => !workedIds.has(u.id))

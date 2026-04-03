@@ -7,18 +7,37 @@ const PERSONAL_FIELDS = [
   'bloodType', 'medicalConditions', 'healthInsurance', 'emergencyContact',
 ]
 
+const PROFILE_SELECT = {
+  id: true, name: true, email: true, role: true,
+  createdAt: true, avatar: true,
+  phone: true, birthday: true, address: true, dni: true,
+  cuit: true, alias: true, maritalStatus: true, children: true,
+  educationLevel: true, educationTitle: true, bloodType: true,
+  medicalConditions: true, healthInsurance: true, emergencyContact: true,
+}
+
+const ALLOWED_AVATARS = ['bee.png', 'bee2.png', 'beeartist.png', 'beecorp.png', 'beefitness.png', 'beehoodie.png', 'beeloween.png', 'beepunk.png', 'beezen.png']
+
 async function getProfile(req, res, next) {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
-      select: {
-        id: true, name: true, email: true, role: true,
-        createdAt: true,
-        phone: true, birthday: true, address: true, dni: true,
-        cuit: true, alias: true, maritalStatus: true, children: true,
-        educationLevel: true, educationTitle: true, bloodType: true,
-        medicalConditions: true, healthInsurance: true, emergencyContact: true,
-      },
+      select: PROFILE_SELECT,
+    })
+    res.json(user)
+  } catch (err) { next(err) }
+}
+
+async function updateAvatar(req, res, next) {
+  try {
+    const { avatar } = req.body
+    if (!ALLOWED_AVATARS.includes(avatar)) {
+      return res.status(400).json({ error: 'Avatar no válido' })
+    }
+    const user = await prisma.user.update({
+      where: { id: req.user.id },
+      data: { avatar },
+      select: { id: true, name: true, email: true, role: true, avatar: true },
     })
     res.json(user)
   } catch (err) { next(err) }
@@ -44,14 +63,7 @@ async function updateProfile(req, res, next) {
     const user = await prisma.user.update({
       where: { id: req.user.id },
       data,
-      select: {
-        id: true, name: true, email: true, role: true,
-        createdAt: true,
-        phone: true, birthday: true, address: true, dni: true,
-        cuit: true, alias: true, maritalStatus: true, children: true,
-        educationLevel: true, educationTitle: true, bloodType: true,
-        medicalConditions: true, healthInsurance: true, emergencyContact: true,
-      },
+      select: PROFILE_SELECT,
     })
     res.json(user)
   } catch (err) { next(err) }
@@ -79,4 +91,4 @@ async function changePassword(req, res, next) {
   } catch (err) { next(err) }
 }
 
-module.exports = { getProfile, updateProfile, changePassword }
+module.exports = { getProfile, updateProfile, changePassword, updateAvatar }

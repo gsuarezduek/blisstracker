@@ -4,19 +4,17 @@ import api from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import useRoles from '../hooks/useRoles'
 
-function Avatar({ name, size = 'lg' }) {
-  const initials = name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase()
-  const colors = ['bg-indigo-500', 'bg-pink-500', 'bg-yellow-500', 'bg-green-500', 'bg-blue-500', 'bg-purple-500']
-  const color = colors[name.charCodeAt(0) % colors.length]
-  const cls = size === 'lg'
-    ? 'w-16 h-16 text-2xl'
-    : 'w-10 h-10 text-sm'
-  return (
-    <div className={`${color} ${cls} text-white rounded-full flex items-center justify-center font-bold flex-shrink-0`}>
-      {initials}
-    </div>
-  )
-}
+const AVATARS = [
+  { file: 'bee.png',        label: 'Clásica' },
+  { file: 'bee2.png',       label: 'Alternativa' },
+  { file: 'beeartist.png',  label: 'Artista' },
+  { file: 'beecorp.png',    label: 'Corp' },
+  { file: 'beefitness.png', label: 'Fitness' },
+  { file: 'beehoodie.png',  label: 'Hoodie' },
+  { file: 'beeloween.png',  label: 'Halloween' },
+  { file: 'beepunk.png',    label: 'Punk' },
+  { file: 'beezen.png',     label: 'Zen' },
+]
 
 function Field({ label, children }) {
   return (
@@ -75,7 +73,7 @@ const BLOOD_OPTIONS = [
 ].map(v => ({ value: v, label: v }))
 
 export default function MyProfile() {
-  const { user } = useAuth()
+  const { user, updateUser } = useAuth()
   const { labelFor } = useRoles()
 
   const [profile, setProfile] = useState(null)
@@ -87,9 +85,13 @@ export default function MyProfile() {
   const [pwSaving, setPwSaving] = useState(false)
   const [pwMsg, setPwMsg] = useState({ text: '', error: false })
 
+  const [avatarSaving, setAvatarSaving] = useState(false)
+  const [selectedAvatar, setSelectedAvatar] = useState(null)
+
   useEffect(() => {
     api.get('/profile').then(({ data }) => {
       setProfile(data)
+      setSelectedAvatar(data.avatar ?? 'bee.png')
       setForm({
         phone:            data.phone ?? '',
         birthday:         data.birthday ? data.birthday.slice(0, 10) : '',
@@ -111,6 +113,17 @@ export default function MyProfile() {
 
   function set(field) {
     return val => setForm(prev => ({ ...prev, [field]: val }))
+  }
+
+  async function handleSaveAvatar() {
+    if (!selectedAvatar || selectedAvatar === profile.avatar) return
+    setAvatarSaving(true)
+    try {
+      const { data } = await api.patch('/profile/avatar', { avatar: selectedAvatar })
+      setProfile(prev => ({ ...prev, avatar: data.avatar }))
+      updateUser({ avatar: data.avatar })
+    } catch (_) {}
+    finally { setAvatarSaving(false) }
   }
 
   async function handleSavePersonal(e) {
@@ -170,15 +183,53 @@ export default function MyProfile() {
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">
 
         {/* Identity card */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl border dark:border-gray-700 p-6 flex items-center gap-5">
-          <Avatar name={profile.name} size="lg" />
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border dark:border-gray-700 p-6">
+          <div className="flex items-center gap-5 mb-5">
+            <img
+              src={`/perfiles/${profile.avatar ?? 'bee.png'}`}
+              alt="avatar"
+              className="w-24 h-24 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600 flex-shrink-0"
+            />
+            <div>
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white">{profile.name}</h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{labelFor(profile.role)}</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">En Bliss desde el {joinDate}</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">{profile.email}</p>
+            </div>
+          </div>
+
+          {/* Avatar picker */}
           <div>
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white">{profile.name}</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{labelFor(profile.role)}</p>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-              En Bliss desde el {joinDate}
-            </p>
-            <p className="text-xs text-gray-400 dark:text-gray-500">{profile.email}</p>
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">Foto de perfil</p>
+            <div className="flex items-end gap-3 flex-wrap">
+              {AVATARS.map(a => (
+                <button
+                  key={a.file}
+                  onClick={() => setSelectedAvatar(a.file)}
+                  title={a.label}
+                  className={`rounded-full transition-all ${
+                    selectedAvatar === a.file
+                      ? 'ring-2 ring-primary-500 ring-offset-2 dark:ring-offset-gray-800'
+                      : 'opacity-60 hover:opacity-90'
+                  }`}
+                >
+                  <img
+                    src={`/perfiles/${a.file}`}
+                    alt={a.label}
+                    className="w-12 h-12 rounded-full object-cover"
+                  />
+                </button>
+              ))}
+              {selectedAvatar !== (profile.avatar ?? 'bee.png') && (
+                <button
+                  onClick={handleSaveAvatar}
+                  disabled={avatarSaving}
+                  className="ml-2 text-sm bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white font-medium rounded-lg px-4 py-2 transition-colors"
+                >
+                  {avatarSaving ? 'Guardando...' : 'Guardar foto'}
+                </button>
+              )}
+            </div>
           </div>
         </div>
 

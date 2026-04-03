@@ -2,7 +2,7 @@ const prisma = require('../lib/prisma')
 
 const includeDetails = {
   services: { include: { service: true }, orderBy: { service: { name: 'asc' } } },
-  members:  { include: { user: { select: { id: true, name: true, role: true } } }, orderBy: { user: { name: 'asc' } } },
+  members:  { include: { user: { select: { id: true, name: true, role: true, avatar: true } } }, orderBy: { user: { name: 'asc' } } },
 }
 
 // Active projects — admin gets all, regular users get only their assigned projects
@@ -99,7 +99,7 @@ async function projectTasks(req, res, next) {
         status: { in: ['PENDING', 'IN_PROGRESS', 'PAUSED', 'BLOCKED'] },
       },
       include: {
-        user: { select: { id: true, name: true, role: true } },
+        user: { select: { id: true, name: true, role: true, avatar: true } },
       },
       orderBy: [{ status: 'asc' }, { createdAt: 'asc' }],
     })

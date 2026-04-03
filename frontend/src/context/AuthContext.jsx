@@ -38,8 +38,12 @@ export function AuthProvider({ children }) {
     setUser(null)
   }
 
+  function updateUser(updates) {
+    setUser(prev => ({ ...prev, ...updates }))
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, loginWithGoogle, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, loginWithGoogle, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   )

@@ -232,4 +232,37 @@ async function setDuration(req, res, next) {
   } catch (err) { next(err) }
 }
 
-module.exports = { create, startTask, pauseTask, resumeTask, completeTask, blockTask, unblockTask, remove, setDuration }
+async function starTask(req, res, next) {
+  try {
+    const userId = req.user.id
+    const id = Number(req.params.id)
+
+    const task = await prisma.task.findUnique({ where: { id } })
+    if (!task || task.userId !== userId) return res.status(404).json({ error: 'Tarea no encontrada' })
+
+    const currentLevel = task.starred || 0
+    const nextLevel = (currentLevel + 1) % 4  // ciclo: 0→1→2→3→0
+
+    // Al agregar una nueva estrella (0→1), verificar límite de 3 destacadas
+    if (nextLevel === 1) {
+      const starredCount = await prisma.task.count({
+        where: { userId, starred: { gt: 0 }, status: { not: 'COMPLETED' } },
+      })
+      if (starredCount >= 3) {
+        return res.status(409).json({ error: 'Máximo 3 tareas destacadas. Quitá una primero.' })
+      }
+    }
+
+    const updated = await prisma.task.update({
+      where: { id },
+      data: { starred: nextLevel },
+      include: { project: true, createdBy: { select: { id: true, name: true } } },
+    })
+    res.json(updated)
+  } catch (err) {
+    if (err.code === 'P2025') return res.status(404).json({ error: 'Tarea no encontrada' })
+    next(err)
+  }
+}
+
+module.exports = { create, startTask, pauseTask, resumeTask, completeTask, blockTask, unblockTask, remove, setDuration, starTask }
