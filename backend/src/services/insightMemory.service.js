@@ -100,7 +100,11 @@ Español rioplatense, directo. Solo hechos que los datos muestran. No supongas l
     messages: [{ role: 'user', content: ctx }],
   })
 
-  const parsed = JSON.parse(msg.content[0].text.trim())
+  let rawText = msg.content[0].text.trim()
+  if (rawText.startsWith('```')) {
+    rawText = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
+  }
+  const parsed = JSON.parse(rawText)
 
   return prisma.userInsightMemory.upsert({
     where: { userId },
