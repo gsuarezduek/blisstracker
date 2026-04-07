@@ -15,7 +15,6 @@ async function snapshot(req, res, next) {
           orderBy: { updatedAt: 'desc' },
         },
       },
-      orderBy: { startedAt: 'asc' },
     })
 
     const result = workDays.map(wd => {
@@ -41,6 +40,17 @@ async function snapshot(req, res, next) {
           totalMinutes: totalMins,
         },
       }
+    })
+
+    // Usuarios con tarea en curso: los que empezaron más recientemente van primero
+    // Usuarios sin tarea en curso: van después, ordenados por inicio del workday
+    result.sort((a, b) => {
+      const aTime = a.currentTask?.startedAt ? new Date(a.currentTask.startedAt).getTime() : null
+      const bTime = b.currentTask?.startedAt ? new Date(b.currentTask.startedAt).getTime() : null
+      if (aTime && bTime) return bTime - aTime           // ambos en curso: más reciente primero
+      if (aTime) return -1                               // solo a en curso: a va primero
+      if (bTime) return 1                                // solo b en curso: b va primero
+      return new Date(a.workDay.startedAt) - new Date(b.workDay.startedAt) // ninguno: por llegada
     })
 
     const workedIds = new Set(workDays.map(wd => wd.userId))

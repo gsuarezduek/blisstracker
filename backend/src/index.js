@@ -18,3 +18,17 @@ cron.schedule('0 0 * * 6', async () => {
   console.log('[InsightMemory] Iniciando actualización semanal (sábado 00:00 ART)...')
   await updateAllMemories()
 }, { timezone: 'America/Argentina/Buenos_Aires' })
+
+// Cron: auto-pausar tareas EN CURSO al final del día — medianoche hora Buenos Aires
+cron.schedule('0 0 * * *', async () => {
+  console.log('[AutoPause] Pausando tareas en curso al cierre del día...')
+  const prisma = require('./lib/prisma')
+  const inProgress = await prisma.task.findMany({ where: { status: 'IN_PROGRESS' } })
+  if (inProgress.length === 0) return console.log('[AutoPause] Sin tareas activas.')
+  const now = new Date()
+  await prisma.task.updateMany({
+    where: { status: 'IN_PROGRESS' },
+    data: { status: 'PAUSED', pausedAt: now },
+  })
+  console.log(`[AutoPause] ${inProgress.length} tarea(s) pausada(s).`)
+}, { timezone: 'America/Argentina/Buenos_Aires' })

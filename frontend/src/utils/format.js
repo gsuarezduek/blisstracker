@@ -4,13 +4,17 @@ export function fmtMins(mins) {
   return `${Math.floor(mins / 60)}h ${mins % 60}m`
 }
 
+const MAX_ACTIVE_MINS = 12 * 60  // cota de seguridad: 12h máximo para tareas en curso
+
 // Active minutes worked on a task, excluding paused time
 export function activeMinutes(task) {
   if (!task.startedAt) return 0
   const base = task.status === 'PAUSED' && task.pausedAt
     ? new Date(task.pausedAt) - new Date(task.startedAt)
     : Date.now()              - new Date(task.startedAt)
-  return Math.max(0, Math.round(base / 60000) - (task.pausedMinutes || 0))
+  const result = Math.max(0, Math.round(base / 60000) - (task.pausedMinutes || 0))
+  // Si la tarea sigue EN CURSO y supera el máximo, es un zombie — cap para evitar valores absurdos
+  return task.status === 'IN_PROGRESS' ? Math.min(result, MAX_ACTIVE_MINS) : result
 }
 
 // Duration of a completed task as formatted string, or null

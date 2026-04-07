@@ -342,9 +342,15 @@ async function addToToday(req, res, next) {
       return res.status(400).json({ error: 'La tarea ya está en el día de hoy.' })
     }
 
-    // If the task is IN_PROGRESS (carry-over edge case), check no other active task
+    // If the task is IN_PROGRESS (carry-over edge case), check no OTHER active task
     if (task.status === 'IN_PROGRESS') {
-      await assertNoActiveTask(userId)
+      const otherActive = await prisma.task.findFirst({
+        where: { userId, status: 'IN_PROGRESS', id: { not: taskId } },
+      })
+      if (otherActive) throw Object.assign(
+        new Error('Ya tenés una tarea en curso. Pausala o completala primero.'),
+        { status: 409 }
+      )
     }
 
     // Get or create today's workday
