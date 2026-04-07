@@ -13,6 +13,14 @@ function weekMondayStr() {
   return monday.toISOString().slice(0, 10)
 }
 
+// Resolves a route param that can be either a numeric ID or a project name
+async function resolveProjectId(param) {
+  const num = Number(param)
+  if (Number.isInteger(num) && num > 0) return num
+  const project = await prisma.project.findFirst({ where: { name: param } })
+  return project?.id ?? null
+}
+
 const includeDetails = {
   services: { include: { service: true }, orderBy: { service: { name: 'asc' } } },
   members:  { include: { user: { select: { id: true, name: true, role: true, avatar: true } } }, orderBy: { user: { name: 'asc' } } },
@@ -158,7 +166,8 @@ async function update(req, res, next) {
 
 async function projectTasks(req, res, next) {
   try {
-    const projectId = Number(req.params.id)
+    const projectId = await resolveProjectId(req.params.id)
+    if (!projectId) return res.status(404).json({ error: 'Proyecto no encontrado' })
     const userId = req.user.id
     const isAdmin = req.user.role === 'ADMIN'
 
@@ -173,7 +182,8 @@ async function projectTasks(req, res, next) {
     const project = await prisma.project.findUnique({
       where: { id: projectId },
       select: {
-        id: true, name: true, createdAt: true,
+        id: true, name: true, createdAt: true, situation: true,
+        timezone: true, linksEnabled: true, situationEnabled: true,
         links:    { orderBy: { createdAt: 'asc' } },
         services: { include: { service: true }, orderBy: { service: { name: 'asc' } } },
         members:  { include: { user: { select: { id: true, name: true, role: true, avatar: true } } }, orderBy: { user: { name: 'asc' } } },
@@ -231,7 +241,8 @@ async function projectTasks(req, res, next) {
 
 async function projectCompletedHistory(req, res, next) {
   try {
-    const projectId = Number(req.params.id)
+    const projectId = await resolveProjectId(req.params.id)
+    if (!projectId) return res.status(404).json({ error: 'Proyecto no encontrado' })
     const userId = req.user.id
     const isAdmin = req.user.role === 'ADMIN'
     const skip = Math.max(0, Number(req.query.skip ?? 0))
@@ -266,7 +277,8 @@ async function projectCompletedHistory(req, res, next) {
 // Replace all links for a project (any project member or admin)
 async function saveLinks(req, res, next) {
   try {
-    const projectId = Number(req.params.id)
+    const projectId = await resolveProjectId(req.params.id)
+    if (!projectId) return res.status(404).json({ error: 'Proyecto no encontrado' })
     const userId = req.user.id
 
     if (!req.user.isAdmin) {
@@ -304,4 +316,65 @@ async function saveLinks(req, res, next) {
   } catch (err) { next(err) }
 }
 
-module.exports = { list, listAll, create, update, projectTasks, projectCompletedHistory, saveLinks }
+// GET /api/projects/settings — returns global settings (reads from first project or defaults)
+async function getGlobalSettings(req, res, next) {
+  try {
+    const first = await prisma.project.findFirst({
+      select: { timezone: true, linksEnabled: true, situationEnabled: true },
+      orderBy: { id: 'asc' },
+    })
+    res.json(first ?? {
+      timezone: 'America/Argentina/Buenos_Aires',
+      linksEnabled: true,
+      situationEnabled: true,
+    })
+  } catch (err) { next(err) }
+}
+
+// PATCH /api/projects/settings — applies settings to ALL projects
+async function saveGlobalSettings(req, res, next) {
+  try {
+    const { timezone, linksEnabled, situationEnabled } = req.body
+    const data = {}
+
+    if (timezone !== undefined) {
+      try { Intl.DateTimeFormat(undefined, { timeZone: timezone }) }
+      catch { return res.status(400).json({ error: 'Zona horaria inválida' }) }
+      data.timezone = timezone
+    }
+    if (linksEnabled !== undefined) data.linksEnabled = Boolean(linksEnabled)
+    if (situationEnabled !== undefined) data.situationEnabled = Boolean(situationEnabled)
+
+    await prisma.project.updateMany({ data })
+    res.json({ ok: true, ...data })
+  } catch (err) { next(err) }
+}
+
+async function saveSituation(req, res, next) {
+  try {
+    const projectId = await resolveProjectId(req.params.id)
+    if (!projectId) return res.status(404).json({ error: 'Proyecto no encontrado' })
+    const userId = req.user.id
+
+    if (!req.user.isAdmin) {
+      const member = await prisma.projectMember.findUnique({
+        where: { projectId_userId: { projectId, userId } },
+      })
+      if (!member) return res.status(403).json({ error: 'No tenés acceso a este proyecto' })
+    }
+
+    const { situation } = req.body
+    if (typeof situation !== 'string') {
+      return res.status(400).json({ error: 'situation debe ser un string' })
+    }
+
+    const updated = await prisma.project.update({
+      where: { id: projectId },
+      data: { situation: situation.trim() || null },
+      select: { situation: true },
+    })
+    res.json(updated)
+  } catch (err) { next(err) }
+}
+
+module.exports = { list, listAll, create, update, projectTasks, projectCompletedHistory, saveLinks, saveSituation, getGlobalSettings, saveGlobalSettings }

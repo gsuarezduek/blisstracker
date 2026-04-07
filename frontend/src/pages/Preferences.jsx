@@ -12,7 +12,22 @@ export default function Preferences() {
   const [togglingD,    setTogglingD]    = useState(false)
   const [sending,      setSending]      = useState(false)
   const [sendMsg,      setSendMsg]      = useState({ text: '', error: false })
-  const [loaded,       setLoaded]       = useState(false)
+  const [loaded,         setLoaded]         = useState(false)
+  const [globalSettings, setGlobalSettings] = useState(null)
+
+  const TIMEZONES = [
+    { value: 'America/Argentina/Buenos_Aires', label: 'Buenos Aires (UTC-3)' },
+    { value: 'America/Sao_Paulo',              label: 'São Paulo (UTC-3)' },
+    { value: 'America/Santiago',               label: 'Santiago (UTC-4/-3)' },
+    { value: 'America/Bogota',                 label: 'Bogotá (UTC-5)' },
+    { value: 'America/Lima',                   label: 'Lima (UTC-5)' },
+    { value: 'America/Mexico_City',            label: 'Ciudad de México (UTC-6/-5)' },
+    { value: 'America/New_York',               label: 'Nueva York (UTC-5/-4)' },
+    { value: 'America/Los_Angeles',            label: 'Los Ángeles (UTC-8/-7)' },
+    { value: 'Europe/Madrid',                  label: 'Madrid (UTC+1/+2)' },
+    { value: 'Europe/London',                  label: 'Londres (UTC+0/+1)' },
+    { value: 'UTC',                            label: 'UTC' },
+  ]
 
   useEffect(() => {
     api.get('/profile').then(({ data }) => {
@@ -21,6 +36,20 @@ export default function Preferences() {
       setLoaded(true)
     })
   }, [])
+
+  useEffect(() => {
+    if (!user?.isAdmin) return
+    api.get('/projects/settings').then(({ data }) => setGlobalSettings(data))
+  }, [user?.isAdmin])
+
+  async function handleGlobalSetting(patch) {
+    setGlobalSettings(prev => ({ ...prev, ...patch }))
+    try {
+      await api.patch('/projects/settings', patch)
+    } catch (_) {
+      api.get('/projects/settings').then(({ data }) => setGlobalSettings(data))
+    }
+  }
 
   async function handleToggleWeekly() {
     const next = !weeklyEmail
@@ -224,6 +253,65 @@ export default function Preferences() {
             )}
           </div>
         </div>
+
+        {/* Preferencias de Proyectos — solo admins */}
+        {user?.isAdmin && globalSettings && (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border dark:border-gray-700 p-6">
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Proyectos</h2>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mb-5">
+              Configuración global compartida por todos los admins. Los cambios se aplican a todos los proyectos.
+            </p>
+
+            <div className="space-y-5">
+              {/* Zona horaria */}
+              <div className="flex items-start justify-between gap-4 py-4 border-b dark:border-gray-700">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Zona horaria</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    Afecta cómo se muestran las fechas en la vista de cada proyecto.
+                  </p>
+                </div>
+                <select
+                  value={globalSettings.timezone || 'America/Argentina/Buenos_Aires'}
+                  onChange={e => handleGlobalSetting({ timezone: e.target.value })}
+                  className="text-xs border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-400 min-w-[190px]"
+                >
+                  {TIMEZONES.map(tz => (
+                    <option key={tz.value} value={tz.value}>{tz.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Links útiles */}
+              <div className="flex items-start justify-between gap-4 py-4 border-b dark:border-gray-700">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Links útiles</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    Muestra la sección de links en la vista de todos los proyectos.
+                  </p>
+                </div>
+                <Toggle
+                  on={globalSettings.linksEnabled !== false}
+                  onToggle={() => handleGlobalSetting({ linksEnabled: !globalSettings.linksEnabled })}
+                />
+              </div>
+
+              {/* Situación de la cuenta */}
+              <div className="flex items-start justify-between gap-4 py-4">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Situación de la cuenta</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    Muestra el editor de situación en la vista de todos los proyectos.
+                  </p>
+                </div>
+                <Toggle
+                  on={globalSettings.situationEnabled !== false}
+                  onToggle={() => handleGlobalSetting({ situationEnabled: !globalSettings.situationEnabled })}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
       </main>
     </div>

@@ -103,6 +103,10 @@ model Project {
   id        Int      @id @default(autoincrement())
   name      String   @unique
   active    Boolean  @default(true)
+  situation        String?
+  timezone         String  @default("America/Argentina/Buenos_Aires")
+  linksEnabled     Boolean @default(true)
+  situationEnabled Boolean @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

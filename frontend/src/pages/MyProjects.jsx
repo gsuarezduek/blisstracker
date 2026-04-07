@@ -85,7 +85,7 @@ export default function MyProjects() {
             return (
               <div
                 key={p.id}
-                onClick={() => navigate(`/my-projects/${p.id}`)}
+                onClick={() => navigate(`/my-projects/${encodeURIComponent(p.name)}`)}
                 className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 flex flex-col gap-4 cursor-pointer hover:border-primary-300 dark:hover:border-primary-700 hover:shadow-md transition-all"
               >
                 {/* Project name */}

@@ -1,0 +1,78 @@
+/* Editor Tiptap — modo edición */
+.situation-editor .tiptap {
+  outline: none;
+}
+.situation-editor .tiptap h2 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0.6em 0 0.3em;
+}
+.situation-editor .tiptap h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0.5em 0 0.25em;
+}
+.situation-editor .tiptap strong {
+  font-weight: 700;
+}
+.situation-editor .tiptap em {
+  font-style: italic;
+}
+.situation-editor .tiptap ul,
+.situation-editor .tiptap ol {
+  padding-left: 1.25rem;
+  margin: 0.35em 0;
+}
+.situation-editor .tiptap ul {
+  list-style-type: disc;
+}
+.situation-editor .tiptap ol {
+  list-style-type: decimal;
+}
+.situation-editor .tiptap li {
+  margin: 0.15em 0;
+}
+.situation-editor .tiptap p {
+  margin: 0.25em 0;
+}
+.situation-editor .tiptap p:first-child {
+  margin-top: 0;
+}
+
+/* Vista de solo lectura */
+.situation-content h2 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0.6em 0 0.3em;
+}
+.situation-content h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0.5em 0 0.25em;
+}
+.situation-content strong {
+  font-weight: 700;
+}
+.situation-content em {
+  font-style: italic;
+}
+.situation-content ul,
+.situation-content ol {
+  padding-left: 1.25rem;
+  margin: 0.35em 0;
+}
+.situation-content ul {
+  list-style-type: disc;
+}
+.situation-content ol {
+  list-style-type: decimal;
+}
+.situation-content li {
+  margin: 0.15em 0;
+}
+.situation-content p {
+  margin: 0.25em 0;
+}
+.situation-content p:first-child {
+  margin-top: 0;
+}

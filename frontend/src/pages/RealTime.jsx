@@ -150,8 +150,17 @@ export default function RealTime() {
     try {
       const { data: res } = await api.get('/realtime')
       const sorted = [...res.entries].sort((a, b) => {
-        const rank = e => e.currentTask ? 0 : !e.workDay.endedAt ? 1 : 2
-        return rank(a) - rank(b) || a.user.name.localeCompare(b.user.name)
+        // Cerrados al final
+        const aEnded = !!a.workDay.endedAt
+        const bEnded = !!b.workDay.endedAt
+        if (aEnded !== bEnded) return aEnded ? 1 : -1
+        // Dentro de activos: con tarea en curso primero, luego sin tarea
+        const aTime = a.currentTask?.startedAt ? new Date(a.currentTask.startedAt).getTime() : null
+        const bTime = b.currentTask?.startedAt ? new Date(b.currentTask.startedAt).getTime() : null
+        if (aTime && bTime) return bTime - aTime   // más reciente arriba
+        if (aTime) return -1
+        if (bTime) return 1
+        return a.user.name.localeCompare(b.user.name)
       })
       setEntries(sorted)
       setNotStarted(res.notStarted)

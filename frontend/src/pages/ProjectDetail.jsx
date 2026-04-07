@@ -7,6 +7,7 @@ import useRoles from '../hooks/useRoles'
 import UserTasksModal from '../components/UserTasksModal'
 import AddTaskModal from '../components/AddTaskModal'
 import TaskCommentsModal from '../components/TaskCommentsModal'
+import ProjectSituation from '../components/ProjectSituation'
 
 const STATUS_LABEL = {
   BLOCKED:     'Bloqueada',
@@ -50,9 +51,9 @@ function Avatar({ user, size = 'md' }) {
   )
 }
 
-function fmtDate(iso) {
+function fmtDate(iso, tz = 'America/Argentina/Buenos_Aires') {
   if (!iso) return ''
-  return new Date(iso).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
+  return new Date(iso).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric', timeZone: tz })
 }
 
 export default function ProjectDetail() {
@@ -75,24 +76,26 @@ export default function ProjectDetail() {
   const [archiveLoading, setArchiveLoading] = useState(false)
   const [archiveOpen,  setArchiveOpen]  = useState(false)
 
+  const encodedId = encodeURIComponent(id)
+
   useEffect(() => {
-    api.get(`/projects/${id}/tasks`)
+    api.get(`/projects/${encodedId}/tasks`)
       .then(r => setData(r.data))
       .catch(err => setError(err.response?.data?.error || 'Error al cargar el proyecto'))
       .finally(() => setLoading(false))
-  }, [id])
+  }, [encodedId])
 
   const loadArchive = useCallback(async (skip = 0) => {
     setArchiveLoading(true)
     try {
-      const { data: res } = await api.get(`/projects/${id}/completed?skip=${skip}`)
+      const { data: res } = await api.get(`/projects/${encodedId}/completed?skip=${skip}`)
       setArchive(prev => skip === 0 ? res.tasks : [...prev, ...res.tasks])
       setHasMore(res.hasMore)
       setArchiveSkip(skip + res.tasks.length)
     } finally {
       setArchiveLoading(false)
     }
-  }, [id])
+  }, [encodedId])
 
   function handleOpenArchive() {
     setArchiveOpen(true)
@@ -102,7 +105,7 @@ export default function ProjectDetail() {
   const totalPending = data?.byUser.reduce((s, u) => s + u.tasks.length, 0) ?? 0
 
   async function handleAddTask() {
-    const { data: res } = await api.get(`/projects/${id}/tasks`)
+    const { data: res } = await api.get(`/projects/${encodedId}/tasks`)
     setData(res)
     setShowAddTask(false)
   }
@@ -125,7 +128,7 @@ export default function ProjectDetail() {
     try {
       const existing = (data.project.links ?? []).map(l => ({ label: l.label, url: l.url }))
       const newLinks = [...existing, { label: linkForm.label.trim(), url: linkForm.url.trim() }]
-      const { data: updated } = await api.put(`/projects/${id}/links`, { links: newLinks })
+      const { data: updated } = await api.put(`/projects/${encodedId}/links`, { links: newLinks })
       setData(prev => ({ ...prev, project: { ...prev.project, links: updated.links } }))
       setLinkForm(null)
     } finally {
@@ -138,7 +141,7 @@ export default function ProjectDetail() {
       .filter(l => l.id !== linkId)
       .map(l => ({ label: l.label, url: l.url }))
     try {
-      const { data: updated } = await api.put(`/projects/${id}/links`, { links: newLinks })
+      const { data: updated } = await api.put(`/projects/${encodedId}/links`, { links: newLinks })
       setData(prev => ({ ...prev, project: { ...prev.project, links: updated.links } }))
     } catch (err) {
       console.error('Error al eliminar link', err)
@@ -188,7 +191,7 @@ export default function ProjectDetail() {
                   {data.project.createdAt && (
                     <p className="text-xs text-gray-400 dark:text-gray-500">
                       Activo desde: <span className="font-medium text-gray-500 dark:text-gray-400">
-                        {new Date(data.project.createdAt).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        {new Date(data.project.createdAt).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: data.project.timezone || 'America/Argentina/Buenos_Aires' })}
                       </span>
                     </p>
                   )}
@@ -205,7 +208,16 @@ export default function ProjectDetail() {
               </button>
             </div>
 
+            {/* Situación de la Cuenta */}
+            {data.project.situationEnabled !== false && (
+              <ProjectSituation
+                encodedProjectId={encodedId}
+                initialContent={data.project.situation || ''}
+              />
+            )}
+
             {/* Links útiles */}
+            {data.project.linksEnabled !== false && (
             <div className="mb-4 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4">
               <div className="flex items-center justify-between mb-3">
                 <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Links útiles</p>
@@ -286,6 +298,7 @@ export default function ProjectDetail() {
                 </div>
               )}
             </div>
+            )}
 
             {/* Servicios */}
             {data.project.services?.length > 0 && (
@@ -418,7 +431,7 @@ export default function ProjectDetail() {
                       <div className="min-w-0 flex-1">
                         <p className="text-sm text-gray-700 dark:text-gray-300 leading-snug">{linkify(task.description)}</p>
                         <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                          {task.user.name} · {fmtDate(task.completedAt)}
+                          {task.user.name} · {fmtDate(task.completedAt, data?.project?.timezone)}
                         </p>
                       </div>
                       <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full px-2 py-0.5 font-semibold flex-shrink-0 mt-0.5">✓</span>
@@ -457,7 +470,7 @@ export default function ProjectDetail() {
                           <div className="min-w-0 flex-1">
                             <p className="text-sm text-gray-700 dark:text-gray-300 leading-snug">{linkify(task.description)}</p>
                             <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                              {task.user.name} · {fmtDate(task.completedAt)}
+                              {task.user.name} · {fmtDate(task.completedAt, data?.project?.timezone)}
                             </p>
                           </div>
                         </div>
