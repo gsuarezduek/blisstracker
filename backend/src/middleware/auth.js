@@ -7,7 +7,7 @@ function auth(req, res, next) {
   }
   try {
     const token = header.slice(7)
-    req.user = jwt.verify(token, process.env.JWT_SECRET)
+    req.user = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] })
     next()
   } catch {
     res.status(401).json({ error: 'Invalid token' })

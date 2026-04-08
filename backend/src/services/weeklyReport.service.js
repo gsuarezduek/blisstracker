@@ -231,7 +231,10 @@ Escribís en español rioplatense, forma clara, directa y ligeramente crítica c
     if (text.startsWith('```')) {
       text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
     }
-    return JSON.parse(text)
+    let parsed
+    try { parsed = JSON.parse(text) }
+    catch { throw new Error('Respuesta de IA inválida') }
+    return parsed
   } catch (err) {
     console.error('[WeeklyReport] Error generando análisis con Claude:', err.message)
     return {

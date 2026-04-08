@@ -23,12 +23,9 @@ cron.schedule('0 0 * * 6', async () => {
 cron.schedule('0 0 * * *', async () => {
   console.log('[AutoPause] Pausando tareas en curso al cierre del día...')
   const prisma = require('./lib/prisma')
-  const inProgress = await prisma.task.findMany({ where: { status: 'IN_PROGRESS' } })
-  if (inProgress.length === 0) return console.log('[AutoPause] Sin tareas activas.')
-  const now = new Date()
-  await prisma.task.updateMany({
+  const { count } = await prisma.task.updateMany({
     where: { status: 'IN_PROGRESS' },
-    data: { status: 'PAUSED', pausedAt: now },
+    data: { status: 'PAUSED', pausedAt: new Date() },
   })
-  console.log(`[AutoPause] ${inProgress.length} tarea(s) pausada(s).`)
+  console.log(count > 0 ? `[AutoPause] ${count} tarea(s) pausada(s).` : '[AutoPause] Sin tareas activas.')
 }, { timezone: 'America/Argentina/Buenos_Aires' })

@@ -242,7 +242,9 @@ Escribís en español rioplatense, tono directo y humano. No usás frases genér
   if (text.startsWith('```')) {
     text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
   }
-  const parsed = JSON.parse(text)
+  let parsed
+  try { parsed = JSON.parse(text) }
+  catch { throw Object.assign(new Error('Respuesta de IA inválida. Intentá de nuevo.'), { status: 502 }) }
   return {
     titulo:     String(parsed.titulo || 'Insight del día').slice(0, 100),
     mensaje:    String(parsed.mensaje || ''),

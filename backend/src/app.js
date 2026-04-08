@@ -54,6 +54,7 @@ const forgotPasswordLimiter = rateLimit({
   legacyHeaders: false,
 })
 app.use('/api/auth/login', loginLimiter)
+app.use('/api/auth/google', loginLimiter)
 app.use('/api/auth/forgot-password', forgotPasswordLimiter)
 
 app.use('/api/auth',          authRoutes)

@@ -104,7 +104,9 @@ Español rioplatense, directo. Solo hechos que los datos muestran. No supongas l
   if (rawText.startsWith('```')) {
     rawText = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
   }
-  const parsed = JSON.parse(rawText)
+  let parsed
+  try { parsed = JSON.parse(rawText) }
+  catch { throw new Error('Respuesta de IA inválida') }
 
   return prisma.userInsightMemory.upsert({
     where: { userId },

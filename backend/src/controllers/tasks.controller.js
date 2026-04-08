@@ -260,6 +260,9 @@ async function setDuration(req, res, next) {
     if (task.status !== 'COMPLETED') {
       return res.status(400).json({ error: 'Solo se puede editar la duración de tareas completadas' })
     }
+    if (!req.user.isAdmin && task.userId !== req.user.id) {
+      return res.status(403).json({ error: 'No tenés permiso para editar esta tarea' })
+    }
     const updated = await prisma.task.update({
       where: { id },
       data: { minutesOverride: minutes },

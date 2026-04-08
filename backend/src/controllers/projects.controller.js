@@ -320,13 +320,15 @@ async function saveLinks(req, res, next) {
 async function getGlobalSettings(req, res, next) {
   try {
     const first = await prisma.project.findFirst({
-      select: { timezone: true, linksEnabled: true, situationEnabled: true },
+      select: { timezone: true, linksEnabled: true, situationEnabled: true, emailFrom: true },
       orderBy: { id: 'asc' },
     })
-    res.json(first ?? {
-      timezone: 'America/Argentina/Buenos_Aires',
-      linksEnabled: true,
-      situationEnabled: true,
+    const effectiveEmailFrom = first?.emailFrom ?? process.env.EMAIL_FROM ?? null
+    res.json({
+      timezone: first?.timezone ?? 'America/Argentina/Buenos_Aires',
+      linksEnabled: first?.linksEnabled ?? true,
+      situationEnabled: first?.situationEnabled ?? true,
+      emailFrom: effectiveEmailFrom,
     })
   } catch (err) { next(err) }
 }
@@ -334,7 +336,7 @@ async function getGlobalSettings(req, res, next) {
 // PATCH /api/projects/settings — applies settings to ALL projects
 async function saveGlobalSettings(req, res, next) {
   try {
-    const { timezone, linksEnabled, situationEnabled } = req.body
+    const { timezone, linksEnabled, situationEnabled, emailFrom } = req.body
     const data = {}
 
     if (timezone !== undefined) {
@@ -344,9 +346,43 @@ async function saveGlobalSettings(req, res, next) {
     }
     if (linksEnabled !== undefined) data.linksEnabled = Boolean(linksEnabled)
     if (situationEnabled !== undefined) data.situationEnabled = Boolean(situationEnabled)
+    if (emailFrom !== undefined) {
+      // Accept null/empty (clear) or a string with a valid email address
+      if (emailFrom === null || emailFrom === '') {
+        data.emailFrom = null
+      } else if (typeof emailFrom === 'string') {
+        // Must contain a valid email address
+        const emailMatch = emailFrom.match(/<([^>]+)>/) || [null, emailFrom.trim()]
+        const addr = emailMatch[1]
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addr)) {
+          return res.status(400).json({ error: 'Dirección de email inválida' })
+        }
+        data.emailFrom = emailFrom.trim()
+      }
+    }
 
+    if (Object.keys(data).length === 0) return res.json({ ok: true })
     await prisma.project.updateMany({ data })
     res.json({ ok: true, ...data })
+  } catch (err) { next(err) }
+}
+
+// POST /api/projects/settings/test-email — sends a test email to the current admin
+async function sendTestEmail(req, res, next) {
+  try {
+    const { sendTestSettingsEmail } = require('../services/email.service')
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { name: true, email: true },
+    })
+    // Get current emailFrom from DB
+    const settings = await prisma.project.findFirst({
+      select: { emailFrom: true },
+      orderBy: { id: 'asc' },
+    })
+    const emailFrom = settings?.emailFrom || null
+    await sendTestSettingsEmail(user.email, user.name, emailFrom)
+    res.json({ ok: true, sentTo: user.email })
   } catch (err) { next(err) }
 }
 
@@ -377,4 +413,4 @@ async function saveSituation(req, res, next) {
   } catch (err) { next(err) }
 }
 
-module.exports = { list, listAll, create, update, projectTasks, projectCompletedHistory, saveLinks, saveSituation, getGlobalSettings, saveGlobalSettings }
+module.exports = { list, listAll, create, update, projectTasks, projectCompletedHistory, saveLinks, saveSituation, getGlobalSettings, saveGlobalSettings, sendTestEmail }

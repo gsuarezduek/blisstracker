@@ -82,7 +82,7 @@ async function resetPassword(req, res, next) {
   try {
     const { token, password } = req.body
     if (!token || !password) return res.status(400).json({ error: 'Datos incompletos' })
-    if (password.length < 6) return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' })
+    if (password.length < 12) return res.status(400).json({ error: 'La contraseña debe tener al menos 12 caracteres' })
 
     const resetToken = await prisma.passwordResetToken.findUnique({ where: { token } })
 

@@ -75,7 +75,7 @@ async function changePassword(req, res, next) {
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ error: 'Datos incompletos' })
     }
-    if (newPassword.length < 6) {
+    if (newPassword.length < 12) {
       return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' })
     }
 

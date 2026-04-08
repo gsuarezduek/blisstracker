@@ -2,6 +2,30 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { GoogleOAuthProvider } from '@react-oauth/google'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
+import React from 'react'
+
+class ErrorBoundary extends React.Component {
+  state = { error: null }
+  static getDerivedStateFromError(err) { return { error: err } }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="flex flex-col items-center justify-center h-screen bg-gray-50 dark:bg-gray-900 text-center px-4">
+          <p className="text-4xl mb-4">⚠️</p>
+          <p className="text-lg font-semibold text-gray-800 dark:text-white mb-2">Algo salió mal</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">{this.state.error.message}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-xl transition-colors"
+          >
+            Recargar página
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 import Login2 from './pages/Login2'
 import Dashboard from './pages/Dashboard'
 import Admin from './pages/Admin'
@@ -23,7 +47,7 @@ function PrivateRoute({ children }) {
 
 function AdminRoute({ children }) {
   const { user, loading } = useAuth()
-  if (loading) return null
+  if (loading) return <div className="flex items-center justify-center h-screen text-gray-500">Cargando...</div>
   if (!user) return <Navigate to="/login" replace />
   if (!user.isAdmin) return <Navigate to="/" replace />
   return children
@@ -31,6 +55,7 @@ function AdminRoute({ children }) {
 
 export default function App() {
   return (
+    <ErrorBoundary>
     <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
     <ThemeProvider>
     <AuthProvider>
@@ -54,5 +79,6 @@ export default function App() {
     </AuthProvider>
     </ThemeProvider>
     </GoogleOAuthProvider>
+    </ErrorBoundary>
   )
 }

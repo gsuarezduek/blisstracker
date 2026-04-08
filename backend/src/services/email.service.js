@@ -1,10 +1,24 @@
 const { Resend } = require('resend')
+const prisma = require('../lib/prisma')
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
+async function getEmailFrom() {
+  try {
+    const first = await prisma.project.findFirst({
+      select: { emailFrom: true },
+      orderBy: { id: 'asc' },
+    })
+    return first?.emailFrom || process.env.EMAIL_FROM || 'BlissTracker <gaston@blissmkt.ar>'
+  } catch {
+    return process.env.EMAIL_FROM || 'BlissTracker <gaston@blissmkt.ar>'
+  }
+}
+
 async function sendPasswordReset(email, name, resetUrl) {
+  const from = await getEmailFrom()
   const { error } = await resend.emails.send({
-    from: 'BlissTracker <gaston@blissmkt.ar>',
+    from,
     to: email,
     subject: 'Recuperar contraseña — BlissTracker',
     html: `
@@ -27,11 +41,12 @@ async function sendPasswordReset(email, name, resetUrl) {
 }
 
 async function sendWelcomeEmail(email, name) {
+  const from = await getEmailFrom()
   const loginUrl = `${process.env.FRONTEND_URL}/login`
   const forgotUrl = `${process.env.FRONTEND_URL}/forgot-password`
 
   const { error } = await resend.emails.send({
-    from: 'BlissTracker <gaston@blissmkt.ar>',
+    from,
     to: email,
     subject: 'Bienvenido a BlissTracker',
     html: `
@@ -58,12 +73,13 @@ async function sendWelcomeEmail(email, name) {
 }
 
 async function sendWeeklySummaryEmail(email, name, html, weekLabel) {
+  const from = await getEmailFrom()
   const subject = weekLabel
     ? `Tu semana en BlissTracker — ${weekLabel}`
     : 'Tu resumen semanal — BlissTracker'
 
   const { error } = await resend.emails.send({
-    from: 'BlissTracker <gaston@blissmkt.ar>',
+    from,
     to: email,
     subject,
     html,
@@ -72,4 +88,27 @@ async function sendWeeklySummaryEmail(email, name, html, weekLabel) {
   if (error) throw new Error(error.message)
 }
 
-module.exports = { sendPasswordReset, sendWelcomeEmail, sendWeeklySummaryEmail }
+async function sendTestSettingsEmail(email, name, fromOverride) {
+  const from = fromOverride || await getEmailFrom()
+  const { error } = await resend.emails.send({
+    from,
+    to: email,
+    subject: 'Email de prueba — BlissTracker',
+    html: `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
+        <h2 style="color: #1e293b; margin-bottom: 8px;">✅ Configuración de email correcta</h2>
+        <p style="color: #475569; margin-bottom: 16px;">Hola <strong>${name}</strong>, este es un email de prueba para verificar que la configuración del remitente funciona correctamente.</p>
+        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;">
+          <p style="margin: 0; color: #166534; font-size: 14px;"><strong>Remitente configurado:</strong> ${from}</p>
+        </div>
+        <p style="color: #94a3b8; font-size: 14px;">Si recibiste este email, la configuración DNS y el remitente están funcionando correctamente.</p>
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
+        <p style="color: #cbd5e1; font-size: 12px;">BlissTracker</p>
+      </div>
+    `,
+  })
+
+  if (error) throw new Error(error.message)
+}
+
+module.exports = { sendPasswordReset, sendWelcomeEmail, sendWeeklySummaryEmail, sendTestSettingsEmail }
