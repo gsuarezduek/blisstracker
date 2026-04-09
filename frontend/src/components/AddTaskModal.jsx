@@ -93,7 +93,6 @@ export default function AddTaskModal({ onAdd, onClose, lockedProject }) {
   const [description, setDescription] = useState('')
   const [projectId, setProjectId] = useState(lockedProject ? String(lockedProject.id) : '')
   const [projects, setProjects] = useState([])
-  const [allUsers, setAllUsers] = useState([])
   const [assigneeId, setAssigneeId] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -105,23 +104,16 @@ export default function AddTaskModal({ onAdd, onClose, lockedProject }) {
     })
   }, [lockedProject])
 
-  useEffect(() => {
-    if (!user?.isAdmin) return
-    api.get('/users').then(r => setAllUsers(r.data.filter(u => u.active)))
-  }, [user?.isAdmin])
-
   // Reset assignee to self when project changes
   useEffect(() => {
     setAssigneeId(user ? String(user.id) : '')
   }, [projectId, user])
 
-  // Admins see all users; others see only project members
-  const assigneeOptions = user?.isAdmin
-    ? allUsers.map(u => ({ id: u.id, name: u.name }))
-    : (lockedProject
-        ? (lockedProject.members ?? [])
-        : (projects.find(p => String(p.id) === projectId)?.members ?? [])
-      ).map(pm => ({ id: pm.user.id, name: pm.user.name }))
+  // Siempre mostrar solo los miembros del proyecto seleccionado
+  const assigneeOptions = (lockedProject
+    ? (lockedProject.members ?? [])
+    : (projects.find(p => String(p.id) === projectId)?.members ?? [])
+  ).map(pm => ({ id: pm.user.id, name: pm.user.name }))
 
   async function handleSubmit(e) {
     e.preventDefault()

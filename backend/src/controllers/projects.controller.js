@@ -169,7 +169,7 @@ async function projectTasks(req, res, next) {
     const projectId = await resolveProjectId(req.params.id)
     if (!projectId) return res.status(404).json({ error: 'Proyecto no encontrado' })
     const userId = req.user.id
-    const isAdmin = req.user.role === 'ADMIN'
+    const isAdmin = req.user.isAdmin
 
     // Verificar acceso
     if (!isAdmin) {
@@ -252,7 +252,7 @@ async function projectCompletedHistory(req, res, next) {
     const projectId = await resolveProjectId(req.params.id)
     if (!projectId) return res.status(404).json({ error: 'Proyecto no encontrado' })
     const userId = req.user.id
-    const isAdmin = req.user.role === 'ADMIN'
+    const isAdmin = req.user.isAdmin
     const skip = Math.max(0, Number(req.query.skip ?? 0))
     const TAKE = 20
 

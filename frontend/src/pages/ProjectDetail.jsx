@@ -77,6 +77,8 @@ export default function ProjectDetail() {
   const [teamTaskResult, setTeamTaskResult] = useState(null) // { ok, errors }
   const teamTaskRef = useRef(null)
 
+  const [projectList, setProjectList] = useState([])
+
   // Archive state
   const [archive,      setArchive]      = useState([])
   const [archiveSkip,  setArchiveSkip]  = useState(0)
@@ -92,6 +94,10 @@ export default function ProjectDetail() {
       .catch(err => setError(err.response?.data?.error || 'Error al cargar el proyecto'))
       .finally(() => setLoading(false))
   }, [encodedId])
+
+  useEffect(() => {
+    api.get('/projects').then(r => setProjectList(r.data)).catch(() => {})
+  }, [])
 
   const loadArchive = useCallback(async (skip = 0) => {
     setArchiveLoading(true)
@@ -188,16 +194,35 @@ export default function ProjectDetail() {
       <Navbar />
       <main className="max-w-3xl mx-auto px-4 py-8">
 
-        {/* Back */}
-        <button
-          onClick={() => navigate('/my-projects')}
-          className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 mb-6 transition-colors"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-            <path fillRule="evenodd" d="M17 10a.75.75 0 01-.75.75H5.612l4.158 3.96a.75.75 0 11-1.04 1.08l-5.5-5.25a.75.75 0 010-1.08l5.5-5.25a.75.75 0 111.04 1.08L5.612 9.25H16.25A.75.75 0 0117 10z" clipRule="evenodd" />
-          </svg>
-          Mis Proyectos
-        </button>
+        {/* Nav bar */}
+        {(() => {
+          const currentIdx = projectList.findIndex(p => String(p.id) === String(id) || p.name === id)
+          const nextProject = currentIdx >= 0 && currentIdx < projectList.length - 1 ? projectList[currentIdx + 1] : null
+          return (
+            <div className="flex items-center justify-between mb-6">
+              <button
+                onClick={() => navigate('/my-projects')}
+                className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                  <path fillRule="evenodd" d="M17 10a.75.75 0 01-.75.75H5.612l4.158 3.96a.75.75 0 11-1.04 1.08l-5.5-5.25a.75.75 0 010-1.08l5.5-5.25a.75.75 0 111.04 1.08L5.612 9.25H16.25A.75.75 0 0117 10z" clipRule="evenodd" />
+                </svg>
+                Mis Proyectos
+              </button>
+              {nextProject && (
+                <button
+                  onClick={() => navigate(`/my-projects/${encodeURIComponent(nextProject.name)}`)}
+                  className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                >
+                  <span className="truncate max-w-[160px]">{nextProject.name}</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 flex-shrink-0">
+                    <path fillRule="evenodd" d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 11-1.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          )
+        })()}
 
         {loading && <div className="text-center py-16 text-gray-400">Cargando...</div>}
 
