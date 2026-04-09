@@ -37,6 +37,7 @@ async function byProject(req, res, next) {
     const tasks = await prisma.task.findMany({
       where,
       include: { project: true, user: { select: { id: true, name: true, role: true } } },
+      orderBy: { completedAt: 'desc' },
     })
 
     // Group by project
@@ -83,7 +84,7 @@ async function byUser(req, res, next) {
         workDay: { select: { date: true } },
         user: { select: { id: true, name: true, role: true } },
       },
-      orderBy: { startedAt: 'asc' },
+      orderBy: { startedAt: 'desc' },
     })
 
     res.json(tasks.map(t => ({
@@ -111,7 +112,7 @@ async function byUserSummary(req, res, next) {
         project: true,
         user: { select: { id: true, name: true, role: true } },
       },
-      orderBy: { completedAt: 'asc' },
+      orderBy: { completedAt: 'desc' },
     })
 
     // Group by user → project → tasks
@@ -152,7 +153,7 @@ async function mine(req, res, next) {
     const tasks = await prisma.task.findMany({
       where,
       include: { project: true },
-      orderBy: { completedAt: 'asc' },
+      orderBy: { completedAt: 'desc' },
     })
 
     let totalMinutes = 0

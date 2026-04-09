@@ -93,6 +93,7 @@ export default function AddTaskModal({ onAdd, onClose, lockedProject }) {
   const [description, setDescription] = useState('')
   const [projectId, setProjectId] = useState(lockedProject ? String(lockedProject.id) : '')
   const [projects, setProjects] = useState([])
+  const [allUsers, setAllUsers] = useState([])
   const [assigneeId, setAssigneeId] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -104,14 +105,23 @@ export default function AddTaskModal({ onAdd, onClose, lockedProject }) {
     })
   }, [lockedProject])
 
+  useEffect(() => {
+    if (!user?.isAdmin) return
+    api.get('/users').then(r => setAllUsers(r.data.filter(u => u.active)))
+  }, [user?.isAdmin])
+
   // Reset assignee to self when project changes
   useEffect(() => {
     setAssigneeId(user ? String(user.id) : '')
   }, [projectId, user])
 
-  const members = lockedProject
-    ? (lockedProject.members ?? [])
-    : (projects.find(p => String(p.id) === projectId)?.members ?? [])
+  // Admins see all users; others see only project members
+  const assigneeOptions = user?.isAdmin
+    ? allUsers.map(u => ({ id: u.id, name: u.name }))
+    : (lockedProject
+        ? (lockedProject.members ?? [])
+        : (projects.find(p => String(p.id) === projectId)?.members ?? [])
+      ).map(pm => ({ id: pm.user.id, name: pm.user.name }))
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -156,7 +166,7 @@ export default function AddTaskModal({ onAdd, onClose, lockedProject }) {
             )}
           </div>
 
-          {members.length > 1 && (
+          {assigneeOptions.length > 1 && (
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Asignar a</label>
               <select
@@ -164,9 +174,9 @@ export default function AddTaskModal({ onAdd, onClose, lockedProject }) {
                 onChange={e => setAssigneeId(e.target.value)}
                 className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
-                {members.map(pm => (
-                  <option key={pm.user.id} value={String(pm.user.id)}>
-                    {pm.user.name}{String(pm.user.id) === String(user?.id) ? ' (yo)' : ''}
+                {assigneeOptions.map(u => (
+                  <option key={u.id} value={String(u.id)}>
+                    {u.name}{String(u.id) === String(user?.id) ? ' (yo)' : ''}
                   </option>
                 ))}
               </select>

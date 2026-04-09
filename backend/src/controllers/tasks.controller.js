@@ -23,7 +23,7 @@ function handleActiveTaskConflict(err) {
 async function create(req, res, next) {
   try {
     const requesterId = req.user.id
-    const isAdmin = req.user.role === 'ADMIN'
+    const isAdmin = req.user.isAdmin
     const { description, projectId, targetUserId } = req.body
     if (!description || !projectId) {
       return res.status(400).json({ error: 'Descripción y proyecto requeridos' })
@@ -31,18 +31,22 @@ async function create(req, res, next) {
 
     const userId = targetUserId ? Number(targetUserId) : requesterId
 
-    // If assigning to someone else, verify both requester and target belong to the project
+    // If assigning to someone else, verify access
     if (userId !== requesterId) {
       if (!isAdmin) {
+        // Non-admin: requester must be a member of the project
         const requesterMember = await prisma.projectMember.findUnique({
           where: { projectId_userId: { projectId: Number(projectId), userId: requesterId } },
         })
         if (!requesterMember) return res.status(403).json({ error: 'No tenés acceso a este proyecto' })
+
+        // Non-admin: target must also be a member
+        const targetMember = await prisma.projectMember.findUnique({
+          where: { projectId_userId: { projectId: Number(projectId), userId } },
+        })
+        if (!targetMember) return res.status(400).json({ error: 'El usuario no pertenece a este proyecto' })
       }
-      const targetMember = await prisma.projectMember.findUnique({
-        where: { projectId_userId: { projectId: Number(projectId), userId } },
-      })
-      if (!targetMember) return res.status(400).json({ error: 'El usuario no pertenece a este proyecto' })
+      // Admins can assign to anyone in any project — no membership check needed
     }
 
     const date = todayString()

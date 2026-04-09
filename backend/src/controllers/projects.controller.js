@@ -30,7 +30,7 @@ const includeDetails = {
 // Active projects — admin gets all, regular users get only their assigned projects
 async function list(req, res, next) {
   try {
-    const isAdmin = req.user.role === 'ADMIN'
+    const isAdmin = req.user.isAdmin
     const where = isAdmin
       ? { active: true }
       : { active: true, members: { some: { userId: req.user.id } } }
@@ -193,7 +193,8 @@ async function projectTasks(req, res, next) {
 
     const monday = weekMondayStr()
 
-    const [activeTasks, completedThisWeek] = await Promise.all([
+    const ACTIVE_LIMIT = 200
+    const [activeTasks, completedThisWeek, activeCount] = await Promise.all([
       prisma.task.findMany({
         where: {
           projectId,
@@ -204,6 +205,7 @@ async function projectTasks(req, res, next) {
           _count: { select: { comments: true } },
         },
         orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
+        take: ACTIVE_LIMIT,
       }),
       prisma.task.findMany({
         where: {
@@ -213,6 +215,10 @@ async function projectTasks(req, res, next) {
         },
         include: { user: { select: { id: true, name: true, role: true, avatar: true } } },
         orderBy: { completedAt: 'desc' },
+        take: 100,
+      }),
+      prisma.task.count({
+        where: { projectId, status: { in: ['PENDING', 'IN_PROGRESS', 'PAUSED', 'BLOCKED'] } },
       }),
     ])
 
@@ -235,6 +241,8 @@ async function projectTasks(req, res, next) {
         id: t.id, description: t.description, completedAt: t.completedAt,
         user: t.user,
       })),
+      activeCount,
+      activeLimit: ACTIVE_LIMIT,
     })
   } catch (err) { next(err) }
 }
@@ -322,7 +330,7 @@ async function saveLinks(req, res, next) {
 async function getGlobalSettings(req, res, next) {
   try {
     const first = await prisma.project.findFirst({
-      select: { timezone: true, linksEnabled: true, situationEnabled: true, emailFrom: true },
+      select: { timezone: true, linksEnabled: true, situationEnabled: true, emailFrom: true, aiWeeklyTokenLimit: true },
       orderBy: { id: 'asc' },
     })
     const effectiveEmailFrom = first?.emailFrom ?? process.env.EMAIL_FROM ?? null
@@ -331,6 +339,40 @@ async function getGlobalSettings(req, res, next) {
       linksEnabled: first?.linksEnabled ?? true,
       situationEnabled: first?.situationEnabled ?? true,
       emailFrom: effectiveEmailFrom,
+      aiWeeklyTokenLimit: first?.aiWeeklyTokenLimit ?? 500000,
+    })
+  } catch (err) { next(err) }
+}
+
+// GET /api/projects/settings/ai-usage — token usage stats for admins
+async function getAiUsage(req, res, next) {
+  try {
+    const now = new Date()
+    const startOfDay   = new Date(now); startOfDay.setHours(0, 0, 0, 0)
+    const startOfWeek  = new Date(now); startOfWeek.setDate(now.getDate() - now.getDay()); startOfWeek.setHours(0, 0, 0, 0)
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+
+    const [day, week, month] = await Promise.all([
+      prisma.aiTokenLog.aggregate({
+        where: { createdAt: { gte: startOfDay } },
+        _sum: { inputTokens: true, outputTokens: true },
+      }),
+      prisma.aiTokenLog.aggregate({
+        where: { createdAt: { gte: startOfWeek } },
+        _sum: { inputTokens: true, outputTokens: true },
+      }),
+      prisma.aiTokenLog.aggregate({
+        where: { createdAt: { gte: startOfMonth } },
+        _sum: { inputTokens: true, outputTokens: true },
+      }),
+    ])
+
+    const toTotal = (agg) => (agg._sum.inputTokens ?? 0) + (agg._sum.outputTokens ?? 0)
+
+    res.json({
+      day:   { input: day._sum.inputTokens ?? 0,   output: day._sum.outputTokens ?? 0,   total: toTotal(day) },
+      week:  { input: week._sum.inputTokens ?? 0,  output: week._sum.outputTokens ?? 0,  total: toTotal(week) },
+      month: { input: month._sum.inputTokens ?? 0, output: month._sum.outputTokens ?? 0, total: toTotal(month) },
     })
   } catch (err) { next(err) }
 }
@@ -338,7 +380,7 @@ async function getGlobalSettings(req, res, next) {
 // PATCH /api/projects/settings — applies settings to ALL projects
 async function saveGlobalSettings(req, res, next) {
   try {
-    const { timezone, linksEnabled, situationEnabled, emailFrom } = req.body
+    const { timezone, linksEnabled, situationEnabled, emailFrom, aiWeeklyTokenLimit } = req.body
     const data = {}
 
     if (timezone !== undefined) {
@@ -348,6 +390,13 @@ async function saveGlobalSettings(req, res, next) {
     }
     if (linksEnabled !== undefined) data.linksEnabled = Boolean(linksEnabled)
     if (situationEnabled !== undefined) data.situationEnabled = Boolean(situationEnabled)
+    if (aiWeeklyTokenLimit !== undefined) {
+      const limit = Number(aiWeeklyTokenLimit)
+      if (!Number.isInteger(limit) || limit < 0) {
+        return res.status(400).json({ error: 'aiWeeklyTokenLimit debe ser un entero positivo' })
+      }
+      data.aiWeeklyTokenLimit = limit
+    }
     if (emailFrom !== undefined) {
       // Accept null/empty (clear) or a string with a valid email address
       if (emailFrom === null || emailFrom === '') {
@@ -415,4 +464,4 @@ async function saveSituation(req, res, next) {
   } catch (err) { next(err) }
 }
 
-module.exports = { list, listAll, create, update, projectTasks, projectCompletedHistory, saveLinks, saveSituation, getGlobalSettings, saveGlobalSettings, sendTestEmail }
+module.exports = { list, listAll, create, update, projectTasks, projectCompletedHistory, saveLinks, saveSituation, getGlobalSettings, saveGlobalSettings, sendTestEmail, getAiUsage }

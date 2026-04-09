@@ -3,6 +3,8 @@ const prisma = require('../lib/prisma')
 const { sendWeeklySummaryEmail } = require('./email.service')
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+const AI_TIMEOUT_MS = 30000
+const { logTokens } = require('../lib/logTokens')
 
 const TZ = 'America/Argentina/Buenos_Aires'
 
@@ -225,7 +227,8 @@ Esta semana: ${completedTasks.length} tareas, ${fmtMins(totalMinutes)} registrad
 
 Escribís en español rioplatense, forma clara, directa y ligeramente crítica cuando aporta valor. Nunca inventás información que no esté en los datos. Si no hay suficiente información para una sección, lo decís brevemente. Escribís como un humano, no como un robot. Evitás frases genéricas.`,
       messages: [{ role: 'user', content: userPrompt }],
-    })
+    }, { timeout: AI_TIMEOUT_MS })
+    logTokens('weeklyReport', user.id, msg.usage)
 
     let text = msg.content[0].text.trim()
     if (text.startsWith('```')) {

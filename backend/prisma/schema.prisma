@@ -107,7 +107,8 @@ model Project {
   timezone         String  @default("America/Argentina/Buenos_Aires")
   linksEnabled     Boolean @default(true)
   situationEnabled Boolean @default(true)
-  emailFrom        String?
+  emailFrom           String?
+  aiWeeklyTokenLimit  Int     @default(500000)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -259,6 +260,17 @@ model TaskComment {
   createdAt DateTime     @default(now())
 
   @@index([taskId])
+}
+
+model AiTokenLog {
+  id           Int      @id @default(autoincrement())
+  service      String   // "insight" | "weeklyReport" | "insightMemory"
+  userId       Int?
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
 }
 
 model DailyInsight {

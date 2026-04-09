@@ -3,6 +3,8 @@ const prisma = require('../lib/prisma')
 const { todayString } = require('../utils/dates')
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+const AI_TIMEOUT_MS = 20000
+const { logTokens } = require('../lib/logTokens')
 const TZ = 'America/Argentina/Buenos_Aires'
 const COOLDOWN_MS = 60 * 60 * 1000 // 1 hora
 
@@ -84,7 +86,8 @@ function buildContext(user, todayTasks, carryOver, completedThisWeek, roleExpect
   const inProgress    = all.filter(t => t.status === 'IN_PROGRESS')
   const blocked       = all.filter(t => t.status === 'BLOCKED')
   const paused        = all.filter(t => t.status === 'PAUSED')
-  const pending       = all.filter(t => t.status === 'PENDING')
+  const pending       = all.filter(t => t.status === 'PENDING' && !t.isBacklog)
+  const backlog       = all.filter(t => t.status === 'PENDING' && t.isBacklog)
   const completedToday = todayTasks.filter(t => t.status === 'COMPLETED')
 
   const roleCtx   = buildRoleContext(roleExpectation)
@@ -119,13 +122,23 @@ function buildContext(user, todayTasks, carryOver, completedThisWeek, roleExpect
   }
 
   if (pending.length > 0) {
-    ctx += `PENDIENTES (${pending.length}):\n`
+    ctx += `PENDIENTES HOY (${pending.length}):\n`
     const visible = pending.slice(0, 12)
     for (const t of visible) {
       const legacy = carryOver.find(c => c.id === t.id) ? ' (días anteriores)' : ''
       ctx += `  - [${t.project.name}] "${t.description}"${legacy}\n`
     }
     if (pending.length > 12) ctx += `  ... y ${pending.length - 12} más\n`
+    ctx += '\n'
+  }
+
+  if (backlog.length > 0) {
+    ctx += `BACKLOG (${backlog.length}) — planificación semanal, no son prioridad inmediata:\n`
+    const visible = backlog.slice(0, 8)
+    for (const t of visible) {
+      ctx += `  - [${t.project.name}] "${t.description}"\n`
+    }
+    if (backlog.length > 8) ctx += `  ... y ${backlog.length - 8} más\n`
     ctx += '\n'
   }
 
@@ -218,6 +231,7 @@ Principios clave que siempre aplicás:
 - Una lista de más de 7-8 pendientes activos es señal de sobrecompromiso — hay que priorizar o delegar.
 - Siempre debe haber claridad sobre cuál es la siguiente acción física y concreta.
 - Los bloqueos de días anteriores son una señal de alarma — indican que algo está trabando el sistema.
+- El BACKLOG es una herramienta de planificación semanal — es donde el usuario organiza lo que piensa hacer más adelante. Nunca lo trates como trabajo urgente ni sugieras que hay que sacarlo del backlog. Su existencia es positiva, no un problema.
 
 Si el contexto incluye DESCRIPCIÓN DEL ROL y TAREAS RECURRENTES DEL ROL, usá esa información para detectar si hay tareas esperadas para esta etapa del mes que no aparecen registradas. Tené en cuenta el día del mes y la frecuencia de cada tarea recurrente. Si detectás una omisión relevante, mencionala en alertaRol.
 
@@ -235,7 +249,8 @@ Devolvés ÚNICAMENTE un objeto JSON válido (sin markdown, sin bloques de códi
 
 Escribís en español rioplatense, tono directo y humano. No usás frases genéricas. No felicitás por cosas básicas.`,
     messages: [{ role: 'user', content: context }],
-  })
+  }, { timeout: AI_TIMEOUT_MS })
+  logTokens('insight', userId, msg.usage)
 
   let text = msg.content[0].text.trim()
   // El modelo a veces envuelve el JSON en bloques de código markdown
@@ -273,6 +288,9 @@ async function getDailyInsight(req, res, next) {
     res.json(insight)
   } catch (err) {
     console.error('[DailyInsight] Error:', err.message)
+    if (err.name === 'APIConnectionTimeoutError' || err.code === 'ETIMEDOUT') {
+      return next(Object.assign(new Error('El servicio de IA no respondió a tiempo. Intentá de nuevo en unos minutos.'), { status: 503 }))
+    }
     next(err)
   }
 }

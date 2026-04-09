@@ -3,6 +3,8 @@ const prisma = require('../lib/prisma')
 const { todayString } = require('../utils/dates')
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+const AI_TIMEOUT_MS = 20000
+const { logTokens } = require('../lib/logTokens')
 const TZ = 'America/Argentina/Buenos_Aires'
 
 function getNWeeksAgoMonday(n) {
@@ -98,7 +100,8 @@ Devolvés ÚNICAMENTE un objeto JSON válido con estas claves:
 
 Español rioplatense, directo. Solo hechos que los datos muestran. No supongas lo que no está en los datos.`,
     messages: [{ role: 'user', content: ctx }],
-  })
+  }, { timeout: AI_TIMEOUT_MS })
+  logTokens('insightMemory', userId, msg.usage)
 
   let rawText = msg.content[0].text.trim()
   if (rawText.startsWith('```')) {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import { linkify } from '../utils/linkify'
@@ -8,6 +8,7 @@ import UserTasksModal from '../components/UserTasksModal'
 import AddTaskModal from '../components/AddTaskModal'
 import TaskCommentsModal from '../components/TaskCommentsModal'
 import ProjectSituation from '../components/ProjectSituation'
+import { useAuth } from '../context/AuthContext'
 
 const STATUS_LABEL = {
   BLOCKED:     'Bloqueada',
@@ -59,6 +60,7 @@ function fmtDate(iso, tz = 'America/Argentina/Buenos_Aires') {
 export default function ProjectDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user: authUser } = useAuth()
   const { labelFor } = useRoles()
   const [data,    setData]    = useState(null)
   const [loading, setLoading] = useState(true)
@@ -68,6 +70,12 @@ export default function ProjectDetail() {
   const [linkForm, setLinkForm] = useState(null) // null = oculto, { label, url } = visible
   const [linkSaving, setLinkSaving] = useState(false)
   const [commentTask, setCommentTask] = useState(null)
+  const [infoTab, setInfoTab] = useState('situacion')
+  const [teamTaskModal, setTeamTaskModal] = useState(false)
+  const [teamTaskDesc, setTeamTaskDesc] = useState('')
+  const [teamTaskSending, setTeamTaskSending] = useState(false)
+  const [teamTaskResult, setTeamTaskResult] = useState(null) // { ok, errors }
+  const teamTaskRef = useRef(null)
 
   // Archive state
   const [archive,      setArchive]      = useState([])
@@ -108,6 +116,33 @@ export default function ProjectDetail() {
     const { data: res } = await api.get(`/projects/${encodedId}/tasks`)
     setData(res)
     setShowAddTask(false)
+  }
+
+  async function handleAddTeamTask(e) {
+    e.preventDefault()
+    if (!teamTaskDesc.trim()) return
+    const members = data?.project?.members ?? []
+    if (members.length === 0) return
+    setTeamTaskSending(true)
+    setTeamTaskResult(null)
+    const results = await Promise.allSettled(
+      members.map(pm =>
+        api.post('/tasks', {
+          description: teamTaskDesc.trim(),
+          projectId: data.project.id,
+          targetUserId: pm.user.id,
+        })
+      )
+    )
+    const errors = results
+      .map((r, i) => r.status === 'rejected' ? members[i].user.name : null)
+      .filter(Boolean)
+    setTeamTaskResult({ ok: results.length - errors.length, errors })
+    setTeamTaskDesc('')
+    setTeamTaskSending(false)
+    // Reload tasks
+    const { data: res } = await api.get(`/projects/${encodedId}/tasks`)
+    setData(res)
   }
 
   function handleCommentAdded(taskId, newCount) {
@@ -208,133 +243,189 @@ export default function ProjectDetail() {
               </button>
             </div>
 
-            {/* Situación de la Cuenta */}
-            {data.project.situationEnabled !== false && (
-              <ProjectSituation
-                encodedProjectId={encodedId}
-                initialContent={data.project.situation || ''}
-              />
-            )}
-
-            {/* Links útiles */}
-            {data.project.linksEnabled !== false && (
-            <div className="mb-4 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Links útiles</p>
-                {!linkForm && (
+            {/* Info tabs: Situación / Links / Personas / Servicios */}
+            <div className="mb-6">
+              {/* Tab bar — mobile select */}
+              <div className="mb-3">
+                <select
+                  className="sm:hidden w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  value={infoTab}
+                  onChange={e => setInfoTab(e.target.value)}
+                >
+                  {data.project.situationEnabled !== false && <option value="situacion">Situación</option>}
+                  {data.project.linksEnabled !== false && <option value="links">Links útiles</option>}
+                  <option value="personas">Personas</option>
+                  {data.project.services?.length > 0 && <option value="servicios">Servicios</option>}
+                </select>
+                {/* Desktop */}
+                <div className="hidden sm:flex gap-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-1 w-fit">
+                  {data.project.situationEnabled !== false && (
+                    <button
+                      onClick={() => setInfoTab('situacion')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${infoTab === 'situacion' ? 'bg-primary-600 text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                    >
+                      Situación
+                    </button>
+                  )}
+                  {data.project.linksEnabled !== false && (
+                    <button
+                      onClick={() => setInfoTab('links')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${infoTab === 'links' ? 'bg-primary-600 text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                    >
+                      Links útiles
+                    </button>
+                  )}
                   <button
-                    onClick={() => setLinkForm({ label: '', url: '' })}
-                    className="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium"
+                    onClick={() => setInfoTab('personas')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${infoTab === 'personas' ? 'bg-primary-600 text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
                   >
-                    + Agregar
+                    Personas
                   </button>
-                )}
+                  {data.project.services?.length > 0 && (
+                    <button
+                      onClick={() => setInfoTab('servicios')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${infoTab === 'servicios' ? 'bg-primary-600 text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                    >
+                      Servicios
+                    </button>
+                  )}
+                </div>
               </div>
 
-              {(data.project.links ?? []).length === 0 && !linkForm && (
-                <p className="text-sm text-gray-400 dark:text-gray-500">Sin links por el momento.</p>
+              {/* Tab: Situación */}
+              {infoTab === 'situacion' && data.project.situationEnabled !== false && (
+                <ProjectSituation
+                  encodedProjectId={encodedId}
+                  initialContent={data.project.situation || ''}
+                />
               )}
 
-              {(data.project.links ?? []).length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {data.project.links.map(link => (
-                    <div key={link.id} className="flex items-center gap-1 group">
-                      <a
-                        href={link.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 text-sm text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20 hover:bg-primary-100 dark:hover:bg-primary-900/40 border border-primary-100 dark:border-primary-800 rounded-lg px-3 py-1.5 transition-colors"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5 flex-shrink-0">
-                          <path d="M12.232 4.232a2.5 2.5 0 013.536 3.536l-1.225 1.224a.75.75 0 001.061 1.06l1.224-1.224a4 4 0 00-5.656-5.656l-3 3a4 4 0 00.225 5.865.75.75 0 00.977-1.138 2.5 2.5 0 01-.142-3.667l3-3z" />
-                          <path d="M11.603 7.963a.75.75 0 00-.977 1.138 2.5 2.5 0 01.142 3.667l-3 3a2.5 2.5 0 01-3.536-3.536l1.225-1.224a.75.75 0 00-1.061-1.06l-1.224 1.224a4 4 0 105.656 5.656l3-3a4 4 0 00-.225-5.865z" />
-                        </svg>
-                        {link.label}
-                      </a>
+              {/* Tab: Links útiles */}
+              {infoTab === 'links' && data.project.linksEnabled !== false && (
+                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">Links útiles</p>
+                    {!linkForm && (
                       <button
-                        onClick={() => handleDeleteLink(link.id)}
-                        className="opacity-0 group-hover:opacity-100 ml-0.5 w-5 h-5 flex items-center justify-center text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-all rounded-full hover:bg-red-50 dark:hover:bg-red-900/20"
-                        title="Eliminar link"
+                        onClick={() => setLinkForm({ label: '', url: '' })}
+                        className="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium"
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
-                          <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-                        </svg>
+                        + Agregar
+                      </button>
+                    )}
+                  </div>
+
+                  {(data.project.links ?? []).length === 0 && !linkForm && (
+                    <p className="text-sm text-gray-400 dark:text-gray-500">Sin links por el momento.</p>
+                  )}
+
+                  {(data.project.links ?? []).length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {data.project.links.map(link => (
+                        <div key={link.id} className="flex items-center gap-1 group">
+                          <a
+                            href={link.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 text-sm text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20 hover:bg-primary-100 dark:hover:bg-primary-900/40 border border-primary-100 dark:border-primary-800 rounded-lg px-3 py-1.5 transition-colors"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5 flex-shrink-0">
+                              <path d="M12.232 4.232a2.5 2.5 0 013.536 3.536l-1.225 1.224a.75.75 0 001.061 1.06l1.224-1.224a4 4 0 00-5.656-5.656l-3 3a4 4 0 00.225 5.865.75.75 0 00.977-1.138 2.5 2.5 0 01-.142-3.667l3-3z" />
+                              <path d="M11.603 7.963a.75.75 0 00-.977 1.138 2.5 2.5 0 01.142 3.667l-3 3a2.5 2.5 0 01-3.536-3.536l1.225-1.224a.75.75 0 00-1.061-1.06l-1.224 1.224a4 4 0 105.656 5.656l3-3a4 4 0 00-.225-5.865z" />
+                            </svg>
+                            {link.label}
+                          </a>
+                          <button
+                            onClick={() => handleDeleteLink(link.id)}
+                            className="opacity-0 group-hover:opacity-100 ml-0.5 w-5 h-5 flex items-center justify-center text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-all rounded-full hover:bg-red-50 dark:hover:bg-red-900/20"
+                            title="Eliminar link"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                              <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {linkForm && (
+                    <div className="mt-2 flex flex-wrap gap-2 items-end">
+                      <input
+                        type="text"
+                        placeholder="Nombre"
+                        value={linkForm.label}
+                        onChange={e => setLinkForm(p => ({ ...p, label: e.target.value }))}
+                        className="flex-1 min-w-[120px] text-sm px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-400"
+                      />
+                      <input
+                        type="url"
+                        placeholder="https://..."
+                        value={linkForm.url}
+                        onChange={e => setLinkForm(p => ({ ...p, url: e.target.value }))}
+                        onKeyDown={e => e.key === 'Enter' && handleAddLink()}
+                        className="flex-[2] min-w-[180px] text-sm px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-400"
+                      />
+                      <button
+                        onClick={handleAddLink}
+                        disabled={linkSaving || !linkForm.label.trim() || !linkForm.url.trim()}
+                        className="text-sm px-3 py-1.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
+                      >
+                        {linkSaving ? '...' : 'Guardar'}
+                      </button>
+                      <button
+                        onClick={() => setLinkForm(null)}
+                        className="text-sm px-3 py-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                      >
+                        Cancelar
                       </button>
                     </div>
-                  ))}
+                  )}
                 </div>
               )}
 
-              {linkForm && (
-                <div className="mt-2 flex flex-wrap gap-2 items-end">
-                  <input
-                    type="text"
-                    placeholder="Nombre"
-                    value={linkForm.label}
-                    onChange={e => setLinkForm(p => ({ ...p, label: e.target.value }))}
-                    className="flex-1 min-w-[120px] text-sm px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-400"
-                  />
-                  <input
-                    type="url"
-                    placeholder="https://..."
-                    value={linkForm.url}
-                    onChange={e => setLinkForm(p => ({ ...p, url: e.target.value }))}
-                    onKeyDown={e => e.key === 'Enter' && handleAddLink()}
-                    className="flex-[2] min-w-[180px] text-sm px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-400"
-                  />
-                  <button
-                    onClick={handleAddLink}
-                    disabled={linkSaving || !linkForm.label.trim() || !linkForm.url.trim()}
-                    className="text-sm px-3 py-1.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
-                  >
-                    {linkSaving ? '...' : 'Guardar'}
-                  </button>
-                  <button
-                    onClick={() => setLinkForm(null)}
-                    className="text-sm px-3 py-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
-                  >
-                    Cancelar
-                  </button>
+              {/* Tab: Personas */}
+              {infoTab === 'personas' && (
+                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4">
+                  {(data.project.members?.length ?? 0) === 0 ? (
+                    <p className="text-sm text-gray-400 dark:text-gray-500">Sin personas en el equipo.</p>
+                  ) : (
+                    <>
+                      <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-3">
+                        Equipo · {data.project.members.length} persona{data.project.members.length !== 1 ? 's' : ''}
+                      </p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {data.project.members.map(pm => (
+                          <div key={pm.user.id} className="flex items-center gap-2 min-w-0">
+                            <Avatar user={pm.user} size="sm" />
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-gray-800 dark:text-gray-200 leading-tight truncate">{pm.user.name}</p>
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${roleColor(pm.user.role)}`}>
+                                {labelFor(pm.user.role)}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Tab: Servicios */}
+              {infoTab === 'servicios' && data.project.services?.length > 0 && (
+                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4">
+                  <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-3">Servicios</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {data.project.services.map(ps => (
+                      <span key={ps.service.id} className="text-xs bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 border border-primary-100 dark:border-primary-800 rounded-full px-2.5 py-0.5 font-medium">
+                        {ps.service.name}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
-            )}
-
-            {/* Servicios */}
-            {data.project.services?.length > 0 && (
-              <div className="mb-4 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4">
-                <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-3">Servicios</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {data.project.services.map(ps => (
-                    <span key={ps.service.id} className="text-xs bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 border border-primary-100 dark:border-primary-800 rounded-full px-2.5 py-0.5 font-medium">
-                      {ps.service.name}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Equipo */}
-            {data.project.members?.length > 0 && (
-              <div className="mb-6 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4">
-                <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-3">
-                  Equipo · {data.project.members.length} persona{data.project.members.length !== 1 ? 's' : ''}
-                </p>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {data.project.members.map(pm => (
-                    <div key={pm.user.id} className="flex items-center gap-2 min-w-0">
-                      <Avatar user={pm.user} size="sm" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-800 dark:text-gray-200 leading-tight truncate">{pm.user.name}</p>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${roleColor(pm.user.role)}`}>
-                          {labelFor(pm.user.role)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
             {/* Empty state for pending */}
             {totalPending === 0 && (
@@ -346,6 +437,82 @@ export default function ProjectDetail() {
             )}
 
             {/* Tareas activas por usuario */}
+            {data?.activeCount > data?.activeLimit && (
+              <div className="mb-4 px-4 py-2.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl text-xs text-amber-700 dark:text-amber-400">
+                Mostrando las primeras {data.activeLimit} tareas activas de {data.activeCount} totales. Completá o mové tareas al backlog para ver el resto.
+              </div>
+            )}
+
+            {/* Agregar tarea a todo el equipo — solo admins, siempre visible */}
+            {authUser?.isAdmin && (
+              <div className="mb-4 bg-white dark:bg-gray-800 rounded-2xl border border-dashed border-gray-300 dark:border-gray-600 overflow-hidden">
+                <button
+                  className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                  onClick={() => { setTeamTaskModal(v => !v); setTeamTaskResult(null); setTeamTaskDesc('') }}
+                >
+                  <div className="w-9 h-9 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center flex-shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-gray-400 dark:text-gray-500">
+                      <path d="M11 5a3 3 0 11-6 0 3 3 0 016 0zM2.615 16.428a1.224 1.224 0 01-.569-1.175 6.002 6.002 0 0111.908 0c.058.467-.172.92-.57 1.174A9.953 9.953 0 018 18a9.953 9.953 0 01-5.385-1.572zM16.25 5.75a.75.75 0 00-1.5 0v2h-2a.75.75 0 000 1.5h2v2a.75.75 0 001.5 0v-2h2a.75.75 0 000-1.5h-2v-2z" />
+                    </svg>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Agregar tarea a todo el equipo</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">{data?.project?.members?.length ?? 0} personas</p>
+                  </div>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
+                    className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${teamTaskModal ? 'rotate-180' : ''}`}
+                  >
+                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                  </svg>
+                </button>
+                {teamTaskModal && (
+                  <div className="px-4 pb-4 pt-1 border-t border-gray-100 dark:border-gray-700">
+                    <form onSubmit={handleAddTeamTask} className="space-y-3">
+                      <textarea
+                        ref={teamTaskRef}
+                        autoFocus
+                        rows={2}
+                        value={teamTaskDesc}
+                        onChange={e => setTeamTaskDesc(e.target.value)}
+                        placeholder="Descripción de la tarea..."
+                        className="w-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 resize-none"
+                      />
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="submit"
+                          disabled={teamTaskSending || !teamTaskDesc.trim()}
+                          className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-xl px-4 py-2 transition-colors disabled:opacity-50"
+                        >
+                          {teamTaskSending ? (
+                            <>
+                              <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                              </svg>
+                              Enviando...
+                            </>
+                          ) : `Asignar a ${data?.project?.members?.length ?? 0} personas`}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setTeamTaskModal(false); setTeamTaskResult(null) }}
+                          className="text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                      {teamTaskResult && (
+                        <div className={`text-xs rounded-lg px-3 py-2 ${teamTaskResult.errors.length > 0 ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400' : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'}`}>
+                          {teamTaskResult.ok > 0 && <span>✓ Tarea asignada a {teamTaskResult.ok} persona{teamTaskResult.ok !== 1 ? 's' : ''}.</span>}
+                          {teamTaskResult.errors.length > 0 && <span> Error en: {teamTaskResult.errors.join(', ')}.</span>}
+                        </div>
+                      )}
+                    </form>
+                  </div>
+                )}
+              </div>
+            )}
+
             {totalPending > 0 && (
               <div className="space-y-4 mb-8">
                 {data.byUser
@@ -412,6 +579,7 @@ export default function ProjectDetail() {
                       </div>
                     </div>
                   ))}
+
               </div>
             )}
 
