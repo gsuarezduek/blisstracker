@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import Navbar from '../components/Navbar'
 import { linkify } from '../utils/linkify'
 import DateRangeFilter from '../components/DateRangeFilter'
+import EditDurationModal from '../components/EditDurationModal'
 import api from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { fmtMins } from '../utils/format'
@@ -18,6 +19,7 @@ export default function MyReports() {
   })
   const [to, setTo] = useState(() => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }))
   const [expandedProject, setExpandedProject] = useState(null)
+  const [editingTask, setEditingTask] = useState(null)
 
   async function loadReport(f = from, t = to) {
     setLoading(true)
@@ -104,13 +106,20 @@ export default function MyReports() {
                 {expandedProject === p.project.id && (
                   <div className="border-t dark:border-gray-700 px-4 py-3 space-y-1.5 bg-gray-50 dark:bg-gray-800/50">
                     {p.taskList.map(task => (
-                      <div key={task.id} className="flex items-start justify-between text-sm py-1.5 border-b border-gray-100 dark:border-gray-700 last:border-b-0">
+                      <button
+                        key={task.id}
+                        onClick={() => setEditingTask(task)}
+                        className="w-full flex items-start justify-between text-sm py-1.5 border-b border-gray-100 dark:border-gray-700 last:border-b-0 hover:bg-blue-50 dark:hover:bg-blue-900/10 rounded px-1 transition-colors group"
+                      >
                         <div className="flex items-start gap-2 flex-1 min-w-0">
                           <span className="text-green-500 mt-0.5 flex-shrink-0">✓</span>
-                          <span className="text-gray-700 dark:text-gray-300">{linkify(task.description)}</span>
+                          <span className="text-gray-700 dark:text-gray-300 text-left">{linkify(task.description)}</span>
                         </div>
-                        <span className="text-gray-500 dark:text-gray-400 flex-shrink-0 ml-3">{fmtMins(task.minutes)}</span>
-                      </div>
+                        <div className="flex items-center gap-1.5 flex-shrink-0 ml-3">
+                          {task.isOverride && <span className="text-amber-500 text-xs">✎</span>}
+                          <span className="text-gray-500 dark:text-gray-400">{fmtMins(task.minutes)}</span>
+                        </div>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -126,6 +135,14 @@ export default function MyReports() {
           </div>
         )}
       </main>
+
+      {editingTask && (
+        <EditDurationModal
+          task={editingTask}
+          onClose={() => setEditingTask(null)}
+          onSaved={() => { setEditingTask(null); loadReport() }}
+        />
+      )}
     </div>
   )
 }

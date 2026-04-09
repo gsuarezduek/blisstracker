@@ -706,6 +706,16 @@ export default function ProjectDetail() {
           task={{ ...commentTask, project: commentTask.project ?? data?.project }}
           onClose={() => setCommentTask(null)}
           onCommentAdded={count => handleCommentAdded(commentTask.id, count)}
+          onTaskEdited={updated => {
+            setCommentTask(prev => ({ ...prev, description: updated.description }))
+            setData(prev => ({
+              ...prev,
+              byUser: prev.byUser.map(u => ({
+                ...u,
+                tasks: u.tasks.map(t => t.id === updated.id ? { ...t, description: updated.description } : t),
+              })),
+            }))
+          }}
         />
       )}
     </div>

@@ -250,6 +250,27 @@ async function unblockTask(req, res, next) {
   }
 }
 
+async function editTask(req, res, next) {
+  try {
+    const id = Number(req.params.id)
+    const { description } = req.body
+    if (!description?.trim()) return res.status(400).json({ error: 'La descripción es requerida' })
+
+    const task = await prisma.task.findUnique({ where: { id } })
+    if (!task) return res.status(404).json({ error: 'Tarea no encontrada' })
+    if (!req.user.isAdmin && task.userId !== req.user.id) {
+      return res.status(403).json({ error: 'No tenés permiso para editar esta tarea' })
+    }
+
+    const updated = await prisma.task.update({
+      where: { id },
+      data: { description: description.trim() },
+      include: taskInclude,
+    })
+    res.json(updated)
+  } catch (err) { next(err) }
+}
+
 async function remove(req, res, next) {
   try {
     await prisma.task.delete({ where: { id: Number(req.params.id), userId: req.user.id } })
@@ -408,4 +429,4 @@ async function moveToBacklog(req, res, next) {
   }
 }
 
-module.exports = { create, startTask, pauseTask, resumeTask, completeTask, blockTask, unblockTask, remove, setDuration, starTask, addToToday, moveToBacklog, completedHistory, assertNoActiveTask }
+module.exports = { create, startTask, pauseTask, resumeTask, completeTask, blockTask, unblockTask, remove, editTask, setDuration, starTask, addToToday, moveToBacklog, completedHistory, assertNoActiveTask }

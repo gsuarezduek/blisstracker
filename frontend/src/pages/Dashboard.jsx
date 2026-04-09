@@ -637,6 +637,7 @@ export default function Dashboard() {
           task={commentTask}
           onClose={() => setCommentTask(null)}
           onCommentAdded={count => handleCommentAdded(commentTask.id, count)}
+          onTaskEdited={updated => { handleUpdateTask(updated); setCommentTask(updated) }}
         />
       )}
 
