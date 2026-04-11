@@ -7,17 +7,26 @@ async function listProductivity(req, res, next) {
       where: { active: true },
       select: {
         id: true, name: true, role: true, avatar: true,
-        insightMemory: {
+        insightMemories: {
           select: {
             tendencias: true, fortalezas: true, areasDeAtencion: true,
             estadisticas: true, weekStart: true, updatedAt: true,
           },
+          orderBy: { weekStart: 'desc' },
+          take: 1,
         },
       },
       orderBy: { name: 'asc' },
     })
 
-    res.json(users)
+    // Normalizar: exponer el registro más reciente como `insightMemory` (o null)
+    const result = users.map(u => ({
+      ...u,
+      insightMemory: u.insightMemories[0] ?? null,
+      insightMemories: undefined,
+    }))
+
+    res.json(result)
   } catch (err) { next(err) }
 }
 
@@ -27,7 +36,15 @@ async function refreshProductivity(req, res, next) {
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, active: true } })
     if (!user || !user.active) return res.status(404).json({ error: 'Usuario no encontrado' })
 
-    const memory = await generateMemoryForUser(userId)
+    await generateMemoryForUser(userId)
+    const memory = await prisma.userInsightMemory.findFirst({
+      where: { userId },
+      orderBy: { weekStart: 'desc' },
+      select: {
+        tendencias: true, fortalezas: true, areasDeAtencion: true,
+        estadisticas: true, weekStart: true, updatedAt: true,
+      },
+    })
     res.json(memory)
   } catch (err) { next(err) }
 }
