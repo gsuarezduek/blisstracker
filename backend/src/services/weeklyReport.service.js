@@ -125,12 +125,38 @@ async function getWeeklyData(userId) {
   }
 }
 
-const FREQ_LABEL = { daily: 'diaria', weekly: 'semanal', monthly: 'mensual', first_week: 'primera semana del mes' }
+const FREQ_LABEL = {
+  daily:      'diaria',
+  weekly:     'semanal',
+  monthly:    'mensual',
+  first_week: 'primera semana del mes',
+  monday:     'lunes (inicio de semana)',
+  friday:     'viernes (cierre de semana)',
+}
 
 function buildRoleContext(roleExpectation) {
   if (!roleExpectation) return ''
   let ctx = ''
-  if (roleExpectation.description) ctx += `\nDESCRIPCIÓN DEL ROL: ${roleExpectation.description}\n`
+
+  if (roleExpectation.description) {
+    ctx += `\nPROPÓSITO DEL ROL: ${roleExpectation.description}\n`
+  }
+
+  const results = Array.isArray(roleExpectation.expectedResults) ? roleExpectation.expectedResults : []
+  if (results.length > 0) {
+    ctx += `RESULTADOS ESPERADOS:\n`
+    for (const r of results) ctx += `  - ${r}\n`
+  }
+
+  const resps = Array.isArray(roleExpectation.operationalResponsibilities) ? roleExpectation.operationalResponsibilities : []
+  if (resps.length > 0) {
+    ctx += `RESPONSABILIDADES OPERATIVAS:\n`
+    for (const r of resps) {
+      ctx += `  ${r.category}:\n`
+      for (const item of (r.items || [])) ctx += `    - ${item}\n`
+    }
+  }
+
   const tasks = Array.isArray(roleExpectation.recurrentTasks) ? roleExpectation.recurrentTasks : []
   if (tasks.length > 0) {
     ctx += `TAREAS RECURRENTES DEL ROL:\n`
@@ -140,6 +166,7 @@ function buildRoleContext(roleExpectation) {
       ctx += `  - ${t.task} [${freq}]${detail}\n`
     }
   }
+
   const deps = Array.isArray(roleExpectation.dependencies) ? roleExpectation.dependencies : []
   if (deps.length > 0) {
     ctx += `DEPENDENCIAS DEL ROL:\n`
@@ -148,6 +175,7 @@ function buildRoleContext(roleExpectation) {
       ctx += `  - ${dir} ${d.roleName}: ${d.description}\n`
     }
   }
+
   return ctx
 }
 
@@ -256,7 +284,11 @@ Esta semana: ${completedTasks.length} tareas, ${fmtMins(totalMinutes)} registrad
 - riesgos: string (posibles problemas si este comportamiento continúa, 2-3 oraciones)
 - recomendaciones: array de exactamente 3 strings (acciones concretas y específicas para la próxima semana)
 - enfoqueProximaSemana: string (qué priorizar la próxima semana, 2-3 oraciones)
-- omisionesRol: string o null (si hay TAREAS RECURRENTES DEL ROL, analizá si alguna tarea semanal o mensual esperada no aparece en las completadas de esta semana y mencionala; null si no hay expectativas configuradas o no hay omisiones)
+- omisionesRol: string o null — analizá el perfil completo del rol si está disponible:
+  · TAREAS RECURRENTES: ¿hay tareas semanales o mensuales que no aparecen en las completadas esta semana?
+  · RESULTADOS ESPERADOS: si los resultados son cuantitativos (ej: "6 Reels por cuenta mensualmente"), ¿el volumen completado esta semana es compatible con cumplirlos al cierre del mes?
+  · RESPONSABILIDADES OPERATIVAS: ¿hay alguna categoría de responsabilidad del rol completamente ausente en las tareas de esta semana?
+  Si encontrás omisiones concretas, mencionálas con datos específicos (ej: "Completaste 2 Reels esta semana, necesitás 4 más para llegar a las 6 del mes"). null si no hay perfil de rol configurado o no hay omisiones relevantes.
 
 Escribís en español rioplatense, forma clara, directa y ligeramente crítica cuando aporta valor. Nunca inventás información que no esté en los datos. Si no hay suficiente información para una sección, lo decís brevemente. Escribís como un humano, no como un robot. Evitás frases genéricas.`,
       messages: [{ role: 'user', content: userPrompt }],

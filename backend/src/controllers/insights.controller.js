@@ -43,12 +43,37 @@ function daysBetween(dateA, dateB) {
   return Math.round(Math.abs(new Date(dateA) - new Date(dateB)) / 86400000)
 }
 
-const FREQ_LABEL = { daily: 'diaria', weekly: 'semanal', monthly: 'mensual', first_week: 'primera semana del mes' }
+const FREQ_LABEL = {
+  daily:      'diaria',
+  weekly:     'semanal',
+  monthly:    'mensual',
+  first_week: 'primera semana del mes',
+  monday:     'lunes (inicio de semana)',
+  friday:     'viernes (cierre de semana)',
+}
 
 function buildRoleContext(roleExpectation) {
   if (!roleExpectation) return ''
   let ctx = ''
-  if (roleExpectation.description) ctx += `\nDESCRIPCIÓN DEL ROL: ${roleExpectation.description}\n`
+
+  if (roleExpectation.description) {
+    ctx += `\nPROPÓSITO DEL ROL: ${roleExpectation.description}\n`
+  }
+
+  const results = Array.isArray(roleExpectation.expectedResults) ? roleExpectation.expectedResults : []
+  if (results.length > 0) {
+    ctx += `RESULTADOS ESPERADOS:\n`
+    for (const r of results) ctx += `  - ${r}\n`
+  }
+
+  const resps = Array.isArray(roleExpectation.operationalResponsibilities) ? roleExpectation.operationalResponsibilities : []
+  if (resps.length > 0) {
+    ctx += `RESPONSABILIDADES OPERATIVAS:\n`
+    for (const r of resps) {
+      ctx += `  ${r.category}:\n`
+      for (const item of (r.items || [])) ctx += `    - ${item}\n`
+    }
+  }
 
   const tasks = Array.isArray(roleExpectation.recurrentTasks) ? roleExpectation.recurrentTasks : []
   if (tasks.length > 0) {
@@ -309,9 +334,13 @@ Principios clave que siempre aplicás:
 
 Si el contexto incluye SUGERENCIA DE AYER, evaluá implícitamente si fue seguida mirando el estado actual de las tareas. No hagas mención explícita de "ayer dijiste X", sino que naturalmente continuá el coaching teniendo en cuenta si el consejo funcionó o no.
 
-Si el contexto incluye DESCRIPCIÓN DEL ROL y TAREAS RECURRENTES DEL ROL, detectá omisiones relevantes para esta etapa del mes y mencionálas en alertaRol.
+Si el contexto incluye información del rol (PROPÓSITO DEL ROL, RESULTADOS ESPERADOS, RESPONSABILIDADES OPERATIVAS, TAREAS RECURRENTES DEL ROL), usá todo ese perfil para el alertaRol:
+- TAREAS RECURRENTES: cruzá con el día de la semana y el momento del mes para detectar si falta algo esperado para hoy/esta semana.
+- RESULTADOS ESPERADOS: si son cuantitativos (ej: "6 Reels por cuenta mensualmente"), considerá si el ritmo de trabajo actual de esta semana es compatible con cumplirlos.
+- RESPONSABILIDADES OPERATIVAS: si el usuario lleva varios días sin tareas de una categoría clave de su rol (ej: "Soporte a campañas"), eso puede ser una omisión relevante.
+Solo generás alertaRol si hay una omisión concreta y accionable. No generás alertas genéricas ni recordatorios de lo que "debería" hacer sin evidencia en los datos.
 
-Si el contexto incluye PERFIL DE PRODUCTIVIDAD, usá esa memoria para personalizar el coaching. No la repitas textualmente — interpretala. Si hay datos de velocidad (quick wins / trabajo profundo), usálos para calibrar las sugerencias.
+Si el contexto incluye PERFIL DE PRODUCTIVIDAD, usá esa memoria para personalizar el coaching. No la repitas textualmente — interpretala. Si hay datos de velocidad (quick wins / trabajo profundo), usálos para calibrar las sugerencias. Si hay datos de receptividad al coaching (% de insights aceptados), ajustá el tono en consecuencia.
 
 Analizás los datos reales del usuario y generás un coaching específico, concreto y accionable para su día de trabajo.
 

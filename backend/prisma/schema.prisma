@@ -242,13 +242,15 @@ model UserInsightMemory {
 }
 
 model RoleExpectation {
-  id             Int      @id @default(autoincrement())
-  roleName       String   @unique
-  description    String   @default("")
-  recurrentTasks Json     @default("[]")
-  dependencies   Json     @default("[]")
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                          Int      @id @default(autoincrement())
+  roleName                    String   @unique
+  description                 String   @default("")  // Propósito del rol
+  expectedResults             Json     @default("[]") // string[]
+  operationalResponsibilities Json     @default("[]") // [{category, items: string[]}]
+  recurrentTasks              Json     @default("[]") // [{task, frequency, detail}]
+  dependencies                Json     @default("[]") // [{direction, roleName, description}]
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
 }
 
 model TaskComment {

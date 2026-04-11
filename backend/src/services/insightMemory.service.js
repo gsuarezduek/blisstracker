@@ -49,7 +49,7 @@ async function generateMemoryForUser(userId) {
   const [user, completedTasks, workDays, previousMemories, feedbackRecords] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, name: true, role: true },
+      select: { id: true, name: true, role: true, insightMemoryEnabled: true },
     }),
     prisma.task.findMany({
       where: {
@@ -102,6 +102,14 @@ async function generateMemoryForUser(userId) {
   ])
 
   if (!user) return null
+
+  // Perfil del rol
+  const roleExpectation = user.role
+    ? await prisma.roleExpectation.findUnique({
+        where: { roleName: user.role },
+        select: { description: true, expectedResults: true, operationalResponsibilities: true, recurrentTasks: true },
+      })
+    : null
 
   // Estadísticas base
   const workDaysWithTasks = workDays.filter(wd => wd.tasks.length > 0)
@@ -181,6 +189,21 @@ async function generateMemoryForUser(userId) {
   // Contexto para Claude
   let ctx = `ANÁLISIS DE LAS ÚLTIMAS 4 SEMANAS\n`
   ctx += `Rol: ${user.role}\n`
+
+  // Perfil del rol — para que Claude contextualice el rendimiento
+  if (roleExpectation) {
+    if (roleExpectation.description) {
+      ctx += `Propósito del rol: ${roleExpectation.description}\n`
+    }
+    const results = Array.isArray(roleExpectation.expectedResults) ? roleExpectation.expectedResults : []
+    if (results.length > 0) {
+      ctx += `Resultados esperados: ${results.join(' | ')}\n`
+    }
+    const resps = Array.isArray(roleExpectation.operationalResponsibilities) ? roleExpectation.operationalResponsibilities : []
+    if (resps.length > 0) {
+      ctx += `Responsabilidades: ${resps.map(r => r.category).join(', ')}\n`
+    }
+  }
   ctx += `Días trabajados: ${workDaysWithTasks.length}\n`
   ctx += `Tareas creadas: ${totalCreated} | Completadas: ${totalCompleted} (${Math.round(tasaCompletado * 100)}%)\n`
   ctx += `Promedio tareas/día: ${promedioTareasPorDia} | Proyectos simultáneos: ${proyectosSimultaneos}\n`
@@ -228,10 +251,12 @@ async function generateMemoryForUser(userId) {
     max_tokens: 500,
     system: `Analizás el historial de trabajo de un usuario y generás un perfil de productividad en JSON.
 
+Si el contexto incluye "Propósito del rol", "Resultados esperados" o "Responsabilidades", usalos para evaluar si el trabajo real está alineado con lo que se espera del rol. Por ejemplo: si se espera producir piezas visuales pero el historial muestra pocas tareas de diseño, eso es relevante para areasDeAtencion.
+
 Devolvés ÚNICAMENTE un objeto JSON válido con estas claves:
-- tendencias: 1-2 oraciones sobre patrones de comportamiento. Usá datos concretos: proyectos con más tiempo, tendencia temporal (mejorando/empeorando), ritmo de trabajo (quick wins vs trabajo profundo). Si hay evolución histórica, describí la dirección.
-- fortalezas: 1 oración específica sobre dónde tiene mejor rendimiento. Mencioná proyectos y métricas concretas cuando estén disponibles.
-- areasDeAtencion: 1-2 oraciones sobre los patrones negativos más relevantes (priorizá los con mayor impacto: tasa de completado por proyecto, tareas atascadas, bloqueos recurrentes, etc.). null si no hay señales preocupantes.
+- tendencias: 1-2 oraciones sobre patrones de comportamiento. Usá datos concretos: proyectos con más tiempo, ritmo (quick wins vs trabajo profundo), tendencia temporal si hay evolución histórica. Si el trabajo está bien alineado con el propósito del rol, mencionalo.
+- fortalezas: 1 oración específica sobre dónde tiene mejor rendimiento. Mencioná proyectos y métricas concretas.
+- areasDeAtencion: 1-2 oraciones sobre los patrones negativos más relevantes. Priorizá por impacto: desalineación con resultados esperados del rol, tasa de completado baja por proyecto, tareas atascadas, bloqueos recurrentes. null si no hay señales preocupantes.
 
 Español rioplatense, directo. Solo hechos que los datos muestran. No supongas lo que no está en los datos.`,
     messages: [{ role: 'user', content: ctx }],

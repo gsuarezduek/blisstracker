@@ -12,9 +12,7 @@ async function list(req, res, next) {
 async function getByRole(req, res, next) {
   try {
     const { roleName } = req.params
-    const expectation = await prisma.roleExpectation.findUnique({
-      where: { roleName },
-    })
+    const expectation = await prisma.roleExpectation.findUnique({ where: { roleName } })
     if (!expectation) return res.json(null)
     res.json(expectation)
   } catch (err) { next(err) }
@@ -23,18 +21,24 @@ async function getByRole(req, res, next) {
 async function upsert(req, res, next) {
   try {
     const { roleName } = req.params
-    const { description = '', recurrentTasks = [], dependencies = [] } = req.body
+    const {
+      description                 = '',
+      expectedResults             = [],
+      operationalResponsibilities = [],
+      recurrentTasks              = [],
+      dependencies                = [],
+    } = req.body
 
+    const data = { description, expectedResults, operationalResponsibilities, recurrentTasks, dependencies }
     const expectation = await prisma.roleExpectation.upsert({
-      where: { roleName },
-      create: { roleName, description, recurrentTasks, dependencies },
-      update: { description, recurrentTasks, dependencies },
+      where:  { roleName },
+      create: { roleName, ...data },
+      update: data,
     })
     res.json(expectation)
   } catch (err) { next(err) }
 }
 
-// Devuelve solo si el rol del usuario autenticado tiene expectativas configuradas (no admin-only)
 async function getMyRoleExpectation(req, res, next) {
   try {
     const user = await prisma.user.findUnique({
@@ -44,7 +48,6 @@ async function getMyRoleExpectation(req, res, next) {
     if (!user?.role) return res.json(null)
     const expectation = await prisma.roleExpectation.findUnique({
       where: { roleName: user.role },
-      select: { roleName: true, description: true, recurrentTasks: true, dependencies: true },
     })
     res.json(expectation)
   } catch (err) { next(err) }
