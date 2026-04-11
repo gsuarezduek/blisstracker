@@ -18,6 +18,13 @@ function getNWeeksAgoMonday(n) {
   return monday.toISOString().slice(0, 10)
 }
 
+function daysAgo(n) {
+  const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: TZ })
+  const [y, m, d] = todayStr.split('-').map(Number)
+  const date = new Date(y, m - 1, d - n)
+  return date.toISOString().slice(0, 10)
+}
+
 // Minutos activos reales: descuenta pausas del tiempo total
 function taskMins(t) {
   if (t.minutesOverride != null) return t.minutesOverride
@@ -28,11 +35,18 @@ function taskMins(t) {
   return 0
 }
 
+function fmtMins(m) {
+  const h = Math.floor(m / 60)
+  const min = m % 60
+  return h > 0 ? `${h}h${min > 0 ? min + 'm' : ''}` : `${min}m`
+}
+
 async function generateMemoryForUser(userId) {
   const fourWeeksAgo = getNWeeksAgoMonday(4)
   const today = todayString()
+  const thirtyDaysAgo = daysAgo(30)
 
-  const [user, completedTasks, workDays, previousMemories] = await Promise.all([
+  const [user, completedTasks, workDays, previousMemories, feedbackRecords] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, name: true, role: true },
@@ -64,16 +78,26 @@ async function generateMemoryForUser(userId) {
             projectId: true,
             blockedReason: true,
             pausedMinutes: true,
+            project: { select: { name: true } },
           },
         },
       },
     }),
-    // Últimas 3 memorias anteriores para mostrar evolución
+    // Últimas 3 memorias para comparar evolución
     prisma.userInsightMemory.findMany({
       where: { userId, weekStart: { not: '' } },
       orderBy: { weekStart: 'desc' },
       take: 3,
       select: { weekStart: true, estadisticas: true },
+    }),
+    // Feedback de los últimos 30 días para medir receptividad
+    prisma.dailyInsight.findMany({
+      where: {
+        userId,
+        feedback: { not: null },
+        createdAt: { gte: new Date(thirtyDaysAgo) },
+      },
+      select: { feedback: true, tono: true },
     }),
   ])
 
@@ -97,35 +121,53 @@ async function generateMemoryForUser(userId) {
       ) / 10
     : 0
 
-  // Promedio de minutos en PAUSED para tareas completadas que fueron pausadas
+  // Promedio en pausa antes de retomar
   const pausedCompleted = completedTasks.filter(t => (t.pausedMinutes || 0) > 0)
   const avgPauseMinutes = pausedCompleted.length > 0
     ? Math.round(pausedCompleted.reduce((s, t) => s + t.pausedMinutes, 0) / pausedCompleted.length)
     : 0
 
-  // Tareas atascadas (siguen PAUSED o BLOCKED en el período)
+  // Tareas atascadas (siguen PAUSED/BLOCKED al final del período)
   const stuckTasksCount = workDays.reduce(
     (s, wd) => s + wd.tasks.filter(t => t.status === 'PAUSED' || t.status === 'BLOCKED').length, 0
   )
 
-  // Distribución por proyecto con tiempo real
-  const byProject = {}
+  // Clasificación de velocidad: quickWins / deepWork / mediana
+  const taskDurations = completedTasks.map(t => taskMins(t)).filter(m => m > 0).sort((a, b) => a - b)
+  const quickWins = taskDurations.filter(m => m < 30).length
+  const deepWork  = taskDurations.filter(m => m >= 90).length
+  const medianMinutes = taskDurations.length > 0
+    ? taskDurations[Math.floor(taskDurations.length / 2)]
+    : 0
+
+  // Tasa de completado por proyecto (contando TODAS las tareas del período)
+  const byProjectAll = {}
+  for (const wd of workDays) {
+    for (const t of wd.tasks) {
+      const name = t.project.name
+      if (!byProjectAll[name]) byProjectAll[name] = { creadas: 0, completadas: 0, minutes: 0 }
+      byProjectAll[name].creadas += 1
+    }
+  }
   for (const t of completedTasks) {
     const name = t.project.name
-    if (!byProject[name]) byProject[name] = { count: 0, minutes: 0 }
-    byProject[name].count   += 1
-    byProject[name].minutes += taskMins(t)
+    if (!byProjectAll[name]) byProjectAll[name] = { creadas: 0, completadas: 0, minutes: 0 }
+    byProjectAll[name].completadas += 1
+    byProjectAll[name].minutes     += taskMins(t)
   }
-  const projectSummary = Object.entries(byProject)
+  // Top proyectos por tiempo invertido
+  const porProyecto = Object.entries(byProjectAll)
     .sort((a, b) => b[1].minutes - a[1].minutes)
-    .slice(0, 8)
-    .map(([p, { count, minutes }]) => {
-      const h = Math.floor(minutes / 60)
-      const m = minutes % 60
-      const timeStr = h > 0 ? `${h}h${m > 0 ? m + 'm' : ''}` : `${m}m`
-      return `${p}: ${count} tareas, ${timeStr}`
-    })
-    .join(' | ')
+    .slice(0, 4)
+    .map(([nombre, { creadas, completadas, minutes }]) => ({ nombre, creadas, completadas, minutes }))
+
+  // Receptividad al coaching (feedback de los últimos 30 días)
+  const upvotes   = feedbackRecords.filter(f => f.feedback === 'up').length
+  const downvotes = feedbackRecords.filter(f => f.feedback === 'down').length
+  const totalFeedback = upvotes + downvotes
+  const feedbackScore = totalFeedback >= 5
+    ? Math.round(upvotes / totalFeedback * 100) / 100
+    : null
 
   // Días con bloqueos
   const daysWithBlocks = new Set()
@@ -133,38 +175,49 @@ async function generateMemoryForUser(userId) {
     if (wd.tasks.some(t => t.status === 'BLOCKED')) daysWithBlocks.add(wd.date)
   }
 
-  // Contexto para Claude
-  const totalMinutes = Object.values(byProject).reduce((s, v) => s + v.minutes, 0)
-  const totalHours = Math.floor(totalMinutes / 60)
-  const totalMinsRem = totalMinutes % 60
+  // Totales de tiempo
+  const totalMinutes = porProyecto.reduce((s, p) => s + p.minutes, 0)
 
+  // Contexto para Claude
   let ctx = `ANÁLISIS DE LAS ÚLTIMAS 4 SEMANAS\n`
   ctx += `Rol: ${user.role}\n`
   ctx += `Días trabajados: ${workDaysWithTasks.length}\n`
   ctx += `Tareas creadas: ${totalCreated} | Completadas: ${totalCompleted} (${Math.round(tasaCompletado * 100)}%)\n`
   ctx += `Promedio tareas/día: ${promedioTareasPorDia} | Proyectos simultáneos: ${proyectosSimultaneos}\n`
-  if (totalMinutes > 0) {
-    ctx += `Tiempo total trabajado: ${totalHours > 0 ? totalHours + 'h' : ''}${totalMinsRem > 0 ? totalMinsRem + 'm' : ''}\n`
-  }
-  if (projectSummary) ctx += `Distribución por proyecto: ${projectSummary}\n`
+  if (totalMinutes > 0) ctx += `Tiempo total trabajado: ${fmtMins(totalMinutes)}\n`
   if (daysWithBlocks.size > 0) ctx += `Días con bloqueos activos: ${daysWithBlocks.size}\n`
   if (stuckTasksCount > 0) ctx += `Tareas atascadas (PAUSED/BLOCKED sin resolver): ${stuckTasksCount}\n`
-  if (avgPauseMinutes > 0) {
-    const ph = Math.floor(avgPauseMinutes / 60)
-    const pm = avgPauseMinutes % 60
-    ctx += `Promedio en pausa antes de retomar: ${ph > 0 ? ph + 'h' : ''}${pm > 0 ? pm + 'm' : ''}\n`
+  if (avgPauseMinutes > 0) ctx += `Promedio en pausa antes de retomar: ${fmtMins(avgPauseMinutes)}\n`
+
+  if (taskDurations.length > 0) {
+    ctx += `Velocidad: mediana ${medianMinutes}m/tarea`
+    if (quickWins > 0) ctx += `, ${quickWins} quick wins (<30m)`
+    if (deepWork  > 0) ctx += `, ${deepWork} trabajo profundo (≥90m)`
+    ctx += '\n'
   }
 
-  // Evolución histórica (últimas semanas previas)
+  if (porProyecto.length > 0) {
+    ctx += `Distribución por proyecto:\n`
+    for (const p of porProyecto) {
+      const pct = p.creadas > 0 ? Math.round(p.completadas / p.creadas * 100) : 0
+      ctx += `  - ${p.nombre}: ${p.completadas}/${p.creadas} completadas (${pct}%)${p.minutes > 0 ? ', ' + fmtMins(p.minutes) : ''}\n`
+    }
+  }
+
+  if (feedbackScore !== null) {
+    ctx += `Receptividad al coaching: ${Math.round(feedbackScore * 100)}% de insights aceptados (${upvotes}👍 / ${downvotes}👎)\n`
+  }
+
+  // Evolución histórica semana a semana
   if (previousMemories.length > 0) {
     ctx += `\nEVOLUCIÓN HISTÓRICA:\n`
     for (const m of previousMemories) {
       const s = m.estadisticas || {}
       if (s.tasaCompletado !== undefined) {
-        ctx += `  Semana ${m.weekStart}: ${Math.round(s.tasaCompletado * 100)}% completado`
+        ctx += `  ${m.weekStart}: ${Math.round(s.tasaCompletado * 100)}% completado`
         if (s.promedioTareasPorDia) ctx += `, ${s.promedioTareasPorDia} tareas/día`
-        if (s.avgPauseMinutes) ctx += `, ${s.avgPauseMinutes}m pausa prom.`
-        if (s.stuckTasksCount) ctx += `, ${s.stuckTasksCount} atascadas`
+        if (s.medianMinutes > 0)    ctx += `, mediana ${s.medianMinutes}m`
+        if (s.stuckTasksCount > 0)  ctx += `, ${s.stuckTasksCount} atascadas`
         ctx += '\n'
       }
     }
@@ -172,13 +225,13 @@ async function generateMemoryForUser(userId) {
 
   const msg = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
-    max_tokens: 400,
+    max_tokens: 500,
     system: `Analizás el historial de trabajo de un usuario y generás un perfil de productividad en JSON.
 
 Devolvés ÚNICAMENTE un objeto JSON válido con estas claves:
-- tendencias: 1-2 oraciones sobre patrones de comportamiento. Usá horas trabajadas por proyecto (no solo cantidad de tareas). Si hay evolución histórica, comentá si mejoró o empeoró.
-- fortalezas: 1 oración sobre en qué áreas o proyectos tiene mejor rendimiento (mencioná proyectos concretos).
-- areasDeAtencion: 1-2 oraciones sobre patrones negativos (baja tasa de completado, bloqueos frecuentes, tareas que quedan atascadas mucho tiempo, desequilibrio de tiempo entre proyectos, etc.). null si no hay señales preocupantes.
+- tendencias: 1-2 oraciones sobre patrones de comportamiento. Usá datos concretos: proyectos con más tiempo, tendencia temporal (mejorando/empeorando), ritmo de trabajo (quick wins vs trabajo profundo). Si hay evolución histórica, describí la dirección.
+- fortalezas: 1 oración específica sobre dónde tiene mejor rendimiento. Mencioná proyectos y métricas concretas cuando estén disponibles.
+- areasDeAtencion: 1-2 oraciones sobre los patrones negativos más relevantes (priorizá los con mayor impacto: tasa de completado por proyecto, tareas atascadas, bloqueos recurrentes, etc.). null si no hay señales preocupantes.
 
 Español rioplatense, directo. Solo hechos que los datos muestran. No supongas lo que no está en los datos.`,
     messages: [{ role: 'user', content: ctx }],
@@ -199,6 +252,11 @@ Español rioplatense, directo. Solo hechos que los datos muestran. No supongas l
     proyectosSimultaneos,
     avgPauseMinutes,
     stuckTasksCount,
+    quickWins,
+    deepWork,
+    medianMinutes,
+    feedbackScore,
+    porProyecto,
   }
 
   await prisma.userInsightMemory.upsert({

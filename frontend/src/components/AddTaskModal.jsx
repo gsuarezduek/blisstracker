@@ -88,31 +88,16 @@ function ProjectCombobox({ projects, value, onChange }) {
   )
 }
 
-// Detecta descripciones vagas usando patrones GTD comunes
-const VAGUE_PATTERNS = [
-  /^(trabajar en|trabajar sobre|trabajar con)\b/i,
-  /^(hacer|hacer el|hacer la|hacer los|hacer las)\s+\w+$/i,
-  /^(ver|ver qué|ver si|ver cómo|ver el|ver la)\b/i,
-  /^(revisar|checkear|checar)\s*$/i,
-  /^(continuar|seguir con|seguir el|seguir la)\b/i,
-  /^(arreglar|solucionar)\s*$/i,
-  /^(pendiente|pending|todo|tareas?)\s*$/i,
-  /^(llamar|llamada|reunión|meeting)\s*$/i,
-]
-
+// Validación liviana: solo detecta lo claramente insuficiente
 function getGtdWarning(desc) {
   const trimmed = desc.trim()
   if (trimmed.length === 0) return null
-  if (trimmed.length < 12) return 'La descripción es muy corta. ¿Qué resultado específico buscás?'
-  for (const pattern of VAGUE_PATTERNS) {
-    if (pattern.test(trimmed)) {
-      return 'Esta descripción puede ser vaga. Intentá incluir qué vas a hacer y cuál es el resultado concreto. Ej: "Redactar propuesta de precios para cliente X" en lugar de "Trabajar en propuesta".'
-    }
-  }
+  if (trimmed.length < 10) return 'La descripción es muy corta. ¿Qué resultado específico buscás?'
+  if (trimmed.length > 140) return 'Esta tarea parece demasiado amplia. Considerá dividirla en pasos más concretos.'
   return null
 }
 
-export default function AddTaskModal({ onAdd, onClose, lockedProject }) {
+export default function AddTaskModal({ onAdd, onClose, lockedProject, alertaGTD }) {
   const { user } = useAuth()
   const [description, setDescription] = useState('')
   const [projectId, setProjectId] = useState(lockedProject ? String(lockedProject.id) : '')
@@ -191,6 +176,15 @@ export default function AddTaskModal({ onAdd, onClose, lockedProject }) {
                 <div className="text-xs text-amber-800 dark:text-amber-300">
                   <p className="font-medium mb-1">Sugerencia GTD</p>
                   <p>{gtdWarning}</p>
+                </div>
+              </div>
+            )}
+            {alertaGTD && (
+              <div className="mt-2 flex gap-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3">
+                <span className="text-blue-500 flex-shrink-0 mt-0.5 text-base">💡</span>
+                <div className="text-xs text-blue-800 dark:text-blue-300">
+                  <p className="font-medium mb-1">Tu coach de hoy detectó tareas vagas</p>
+                  <p className="whitespace-pre-wrap">{alertaGTD}</p>
                 </div>
               </div>
             )}

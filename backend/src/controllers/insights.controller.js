@@ -30,15 +30,25 @@ function getWeekStart() {
   return monday.toISOString().slice(0, 10)
 }
 
+// Retorna la fecha de N días atrás en Buenos Aires (YYYY-MM-DD)
+function dateNDaysAgo(n) {
+  const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: TZ })
+  const [y, m, d] = todayStr.split('-').map(Number)
+  const date = new Date(y, m - 1, d - n)
+  return date.toISOString().slice(0, 10)
+}
+
+// Días transcurridos entre dos strings YYYY-MM-DD
+function daysBetween(dateA, dateB) {
+  return Math.round(Math.abs(new Date(dateA) - new Date(dateB)) / 86400000)
+}
+
 const FREQ_LABEL = { daily: 'diaria', weekly: 'semanal', monthly: 'mensual', first_week: 'primera semana del mes' }
 
 function buildRoleContext(roleExpectation) {
   if (!roleExpectation) return ''
   let ctx = ''
-
-  if (roleExpectation.description) {
-    ctx += `\nDESCRIPCIÓN DEL ROL: ${roleExpectation.description}\n`
-  }
+  if (roleExpectation.description) ctx += `\nDESCRIPCIÓN DEL ROL: ${roleExpectation.description}\n`
 
   const tasks = Array.isArray(roleExpectation.recurrentTasks) ? roleExpectation.recurrentTasks : []
   if (tasks.length > 0) {
@@ -69,6 +79,7 @@ function buildMemoryContext(memories) {
   if (latest.tendencias)      ctx += `Tendencias: ${latest.tendencias}\n`
   if (latest.fortalezas)      ctx += `Fortalezas: ${latest.fortalezas}\n`
   if (latest.areasDeAtencion) ctx += `Áreas de atención: ${latest.areasDeAtencion}\n`
+
   const s = latest.estadisticas || {}
   if (s.tasaCompletado !== undefined) {
     ctx += `Estadísticas: ${Math.round(s.tasaCompletado * 100)}% completado, ${s.promedioTareasPorDia} tareas/día`
@@ -76,42 +87,77 @@ function buildMemoryContext(memories) {
     if (s.stuckTasksCount > 0) ctx += `, ${s.stuckTasksCount} tareas atascadas`
     ctx += '\n'
   }
+  if (s.medianMinutes > 0) {
+    const parts = [`mediana ${s.medianMinutes}m/tarea`]
+    if (s.quickWins > 0) parts.push(`${s.quickWins} quick wins (<30m)`)
+    if (s.deepWork  > 0) parts.push(`${s.deepWork} trabajo profundo (>90m)`)
+    ctx += `Velocidad: ${parts.join(', ')}\n`
+  }
+  if (s.feedbackScore !== null && s.feedbackScore !== undefined) {
+    ctx += `Receptividad al coaching: ${Math.round(s.feedbackScore * 100)}% de insights aceptados\n`
+  }
+  if (Array.isArray(s.porProyecto) && s.porProyecto.length > 0) {
+    ctx += 'Por proyecto (historial):\n'
+    for (const p of s.porProyecto) {
+      const pct = p.creadas > 0 ? Math.round(p.completadas / p.creadas * 100) : 0
+      const h = Math.floor(p.minutes / 60)
+      const m = p.minutes % 60
+      const timeStr = p.minutes > 0 ? ` (${h > 0 ? h + 'h' : ''}${m > 0 ? m + 'm' : ''})` : ''
+      ctx += `  ${p.nombre}: ${p.completadas}/${p.creadas} completadas (${pct}%)${timeStr}\n`
+    }
+  }
+
+  // Evolución semana a semana
   if (memories.length > 1) {
-    ctx += 'Evolución reciente:\n'
-    for (const m of memories.slice(1)) {
-      const ms = m.estadisticas || {}
+    ctx += 'Evolución:\n'
+    for (const mem of memories.slice(1)) {
+      const ms = mem.estadisticas || {}
       if (ms.tasaCompletado !== undefined) {
-        ctx += `  ${m.weekStart}: ${Math.round(ms.tasaCompletado * 100)}% completado`
+        ctx += `  ${mem.weekStart}: ${Math.round(ms.tasaCompletado * 100)}% completado`
         if (ms.promedioTareasPorDia) ctx += `, ${ms.promedioTareasPorDia} tareas/día`
+        if (ms.stuckTasksCount > 0)  ctx += `, ${ms.stuckTasksCount} atascadas`
         ctx += '\n'
       }
     }
   }
+
   return ctx
 }
 
-function buildContext(user, todayTasks, carryOver, completedThisWeek, roleExpectation, memory) {
+function buildContext(user, todayTasks, carryOver, completedThisWeek, roleExpectation, memory, yesterdayInsight, today) {
   const now = new Date()
   const timeStr = now.toLocaleTimeString('es-AR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' })
   const dateStr = now.toLocaleDateString('es-AR', { timeZone: TZ, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
   const all = [...todayTasks, ...carryOver]
-  const inProgress    = all.filter(t => t.status === 'IN_PROGRESS')
-  const blocked       = all.filter(t => t.status === 'BLOCKED')
-  const paused        = all.filter(t => t.status === 'PAUSED')
-  const pending       = all.filter(t => t.status === 'PENDING' && !t.isBacklog)
-  const backlog       = all.filter(t => t.status === 'PENDING' && t.isBacklog)
+  const inProgress     = all.filter(t => t.status === 'IN_PROGRESS')
+  const blocked        = all.filter(t => t.status === 'BLOCKED')
+  const paused         = all.filter(t => t.status === 'PAUSED')
+  const pending        = all.filter(t => t.status === 'PENDING' && !t.isBacklog)
+  const backlog        = all.filter(t => t.status === 'PENDING' && t.isBacklog)
   const completedToday = todayTasks.filter(t => t.status === 'COMPLETED')
+
+  // Set de IDs de carry-over para lookup rápido
+  const carryOverIds = new Set(carryOver.map(t => t.id))
 
   const roleCtx   = buildRoleContext(roleExpectation)
   const memoryCtx = buildMemoryContext(memory)
   let ctx = `FECHA: ${dateStr}\nHORA: ${timeStr}\nROL DEL USUARIO: ${user.role}${roleCtx}${memoryCtx}\n`
 
+  // Sugerencia de ayer
+  if (yesterdayInsight?.sugerencia) {
+    ctx += `SUGERENCIA DE AYER: "${yesterdayInsight.sugerencia}"\n`
+    ctx += `(Tené en cuenta el estado actual de las tareas para evaluar si fue seguida)\n\n`
+  }
+
   if (inProgress.length > 0) {
     ctx += `EN CURSO (${inProgress.length}):\n`
     for (const t of inProgress) {
       const mins = t.startedAt ? Math.round((Date.now() - new Date(t.startedAt)) / 60000) : 0
-      ctx += `  - [${t.project.name}] "${t.description}" — en curso hace ${fmtMins(mins)}\n`
+      const age = carryOverIds.has(t.id) && t.workDay?.date
+        ? ` ⚠ lleva ${daysBetween(today, t.workDay.date)} día(s) abierta`
+        : ''
+      ctx += `  - [${t.project.name}] "${t.description}" — en curso hace ${fmtMins(mins)}${age}\n`
     }
     ctx += '\n'
   }
@@ -119,8 +165,10 @@ function buildContext(user, todayTasks, carryOver, completedThisWeek, roleExpect
   if (blocked.length > 0) {
     ctx += `BLOQUEADAS (${blocked.length}):\n`
     for (const t of blocked) {
-      const legacy = carryOver.find(c => c.id === t.id) ? ' ⚠ días anteriores' : ''
-      ctx += `  - [${t.project.name}] "${t.description}"${t.blockedReason ? ` — motivo: "${t.blockedReason}"` : ''}${legacy}\n`
+      const age = carryOverIds.has(t.id) && t.workDay?.date
+        ? ` ⚠ lleva ${daysBetween(today, t.workDay.date)} día(s) bloqueada`
+        : ''
+      ctx += `  - [${t.project.name}] "${t.description}"${t.blockedReason ? ` — motivo: "${t.blockedReason}"` : ''}${age}\n`
     }
     ctx += '\n'
   }
@@ -128,8 +176,10 @@ function buildContext(user, todayTasks, carryOver, completedThisWeek, roleExpect
   if (paused.length > 0) {
     ctx += `PAUSADAS (${paused.length}):\n`
     for (const t of paused) {
-      const legacy = carryOver.find(c => c.id === t.id) ? ' (días anteriores)' : ''
-      ctx += `  - [${t.project.name}] "${t.description}"${legacy}\n`
+      const age = carryOverIds.has(t.id) && t.workDay?.date
+        ? ` (${daysBetween(today, t.workDay.date)} día(s) sin retomar)`
+        : ''
+      ctx += `  - [${t.project.name}] "${t.description}"${age}\n`
     }
     ctx += '\n'
   }
@@ -138,8 +188,10 @@ function buildContext(user, todayTasks, carryOver, completedThisWeek, roleExpect
     ctx += `PENDIENTES HOY (${pending.length}):\n`
     const visible = pending.slice(0, 12)
     for (const t of visible) {
-      const legacy = carryOver.find(c => c.id === t.id) ? ' (días anteriores)' : ''
-      ctx += `  - [${t.project.name}] "${t.description}"${legacy}\n`
+      const age = carryOverIds.has(t.id) && t.workDay?.date
+        ? ` (${daysBetween(today, t.workDay.date)} día(s) sin iniciar)`
+        : ''
+      ctx += `  - [${t.project.name}] "${t.description}"${age}\n`
     }
     if (pending.length > 12) ctx += `  ... y ${pending.length - 12} más\n`
     ctx += '\n'
@@ -187,6 +239,7 @@ function buildContext(user, todayTasks, carryOver, completedThisWeek, roleExpect
 
 async function generateInsight(userId) {
   const today = todayString()
+  const yesterday = dateNDaysAgo(1)
   const weekStart = getWeekStart()
 
   const [user, workDay, carryOver, completedThisWeek] = await Promise.all([
@@ -206,7 +259,7 @@ async function generateInsight(userId) {
         status: { in: ['PENDING', 'IN_PROGRESS', 'PAUSED', 'BLOCKED'] },
         workDay: { date: { lt: today } },
       },
-      include: { project: true },
+      include: { project: true, workDay: { select: { date: true } } },
     }),
     prisma.task.findMany({
       where: {
@@ -218,8 +271,8 @@ async function generateInsight(userId) {
     }),
   ])
 
-  // Fetch role expectation y memoria en paralelo
-  const [roleExpectation, memory] = await Promise.all([
+  // Fetch role expectation, memoria y sugerencia de ayer en paralelo
+  const [roleExpectation, memory, yesterdayInsight] = await Promise.all([
     user?.role
       ? prisma.roleExpectation.findUnique({ where: { roleName: user.role } })
       : null,
@@ -230,10 +283,14 @@ async function generateInsight(userId) {
           take: 4,
         })
       : null,
+    prisma.dailyInsight.findUnique({
+      where: { userId_date: { userId, date: yesterday } },
+      select: { sugerencia: true },
+    }),
   ])
 
   const todayTasks = workDay?.tasks ?? []
-  const context = buildContext(user, todayTasks, carryOver, completedThisWeek, roleExpectation, memory)
+  const context = buildContext(user, todayTasks, carryOver, completedThisWeek, roleExpectation, memory, yesterdayInsight, today)
 
   const msg = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
@@ -247,12 +304,14 @@ Principios clave que siempre aplicás:
 - Saltar entre muchos proyectos en un mismo día fragmenta la atención y baja la calidad del trabajo.
 - Una lista de más de 7-8 pendientes activos es señal de sobrecompromiso — hay que priorizar o delegar.
 - Siempre debe haber claridad sobre cuál es la siguiente acción física y concreta.
-- Los bloqueos de días anteriores son una señal de alarma — indican que algo está trabando el sistema.
+- Las tareas con "X día(s)" en su etiqueta llevan ese tiempo sin moverse — esto es información crítica. Una tarea bloqueada o pausada hace 5+ días tiene una dinámica completamente diferente a una de ayer.
 - El BACKLOG es una herramienta de planificación semanal — es donde el usuario organiza lo que piensa hacer más adelante. Nunca lo trates como trabajo urgente ni sugieras que hay que sacarlo del backlog. Su existencia es positiva, no un problema.
 
-Si el contexto incluye DESCRIPCIÓN DEL ROL y TAREAS RECURRENTES DEL ROL, usá esa información para detectar si hay tareas esperadas para esta etapa del mes que no aparecen registradas. Tené en cuenta el día del mes y la frecuencia de cada tarea recurrente. Si detectás una omisión relevante, mencionala en alertaRol.
+Si el contexto incluye SUGERENCIA DE AYER, evaluá implícitamente si fue seguida mirando el estado actual de las tareas. No hagas mención explícita de "ayer dijiste X", sino que naturalmente continuá el coaching teniendo en cuenta si el consejo funcionó o no.
 
-Si el contexto incluye PERFIL DE PRODUCTIVIDAD, usá esa memoria para personalizar el coaching: hacé referencia a patrones previos del usuario cuando sea relevante. No repitas la memoria textualmente — interpretala.
+Si el contexto incluye DESCRIPCIÓN DEL ROL y TAREAS RECURRENTES DEL ROL, detectá omisiones relevantes para esta etapa del mes y mencionálas en alertaRol.
+
+Si el contexto incluye PERFIL DE PRODUCTIVIDAD, usá esa memoria para personalizar el coaching. No la repitas textualmente — interpretala. Si hay datos de velocidad (quick wins / trabajo profundo), usálos para calibrar las sugerencias.
 
 Analizás los datos reales del usuario y generás un coaching específico, concreto y accionable para su día de trabajo.
 
@@ -261,7 +320,7 @@ Devolvés ÚNICAMENTE un objeto JSON válido (sin markdown, sin bloques de códi
 - mensaje: string de 2-4 oraciones directas y específicas basadas en los datos reales. Mencioná proyectos y tareas concretas cuando aporte valor.
 - sugerencia: string con UNA acción concreta que puede hacer ahora mismo (o null si no aplica)
 - alertaRol: string con una alerta específica basada en las tareas recurrentes del rol y el momento del mes (o null si no hay expectativas configuradas o no hay omisiones detectadas)
-- alertaGTD: si hay tareas pendientes o en curso con descripciones vagas (conceptos en lugar de acciones concretas), mencioná máximo 2 con una reformulación sugerida. Formato: "\"Trabajar en web\" → \"Enviar 3 opciones de homepage para aprobación\"". null si todas las descripciones son suficientemente concretas.
+- alertaGTD: si hay tareas pendientes o en curso con descripciones vagas (conceptos en lugar de acciones concretas), mencioná máximo 2 con una reformulación sugerida. Formato: "\\"Trabajar en web\\" → \\"Enviar 3 opciones de homepage para aprobación\\"". null si todas las descripciones son suficientemente concretas.
 - tono: exactamente uno de "warning" | "alert" | "positive" | "neutral"
 
 Escribís en español rioplatense, tono directo y humano. No usás frases genéricas. No felicitás por cosas básicas.`,
@@ -270,7 +329,6 @@ Escribís en español rioplatense, tono directo y humano. No usás frases genér
   logTokens('insight', userId, msg.usage)
 
   let text = msg.content[0].text.trim()
-  // El modelo a veces envuelve el JSON en bloques de código markdown
   if (text.startsWith('```')) {
     text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
   }

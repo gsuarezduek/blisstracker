@@ -166,16 +166,20 @@ export default function Dashboard() {
   // Derived state
   const tasks = workDay?.tasks ?? []
 
-  // Today focus = tasks in today's workday that are NOT backlog, newest first
+  // Carry-over activos (IN_PROGRESS/PAUSED/BLOCKED) se muestran en el foco normal, no en backlog
+  const carryOverActive  = useMemo(() => carryOver.filter(t => t.status !== 'PENDING'), [carryOver])
+  const carryOverPending = useMemo(() => carryOver.filter(t => t.status === 'PENDING'),  [carryOver])
+
+  // Today focus = tasks in today's workday that are NOT backlog + carry-over activos, newest first
   const focusTasks = useMemo(() =>
-    tasks.filter(t => !t.isBacklog).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
-    [tasks]
+    [...tasks.filter(t => !t.isBacklog), ...carryOverActive].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
+    [tasks, carryOverActive]
   )
 
-  // Backlog = today's backlog tasks + carry-over from previous days, newest first
+  // Backlog = today's backlog tasks + carry-over PENDING de días anteriores, newest first
   const allBacklog = useMemo(() =>
-    [...tasks.filter(t => t.isBacklog), ...carryOver].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
-    [tasks, carryOver]
+    [...tasks.filter(t => t.isBacklog), ...carryOverPending].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
+    [tasks, carryOverPending]
   )
 
   const activeTask = useMemo(() => focusTasks.find(t => t.status === 'IN_PROGRESS') ?? null, [focusTasks])
@@ -630,7 +634,7 @@ export default function Dashboard() {
         </section>
       </main>
 
-      {showModal && <AddTaskModal onAdd={handleAddTask} onClose={() => setShowModal(false)} />}
+      {showModal && <AddTaskModal onAdd={handleAddTask} onClose={() => setShowModal(false)} alertaGTD={insight?.alertaGTD ?? null} />}
 
       {commentTask && (
         <TaskCommentsModal

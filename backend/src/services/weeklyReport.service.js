@@ -165,14 +165,33 @@ function buildMemoryContext(memories) {
     if (s.stuckTasksCount > 0) ctx += `, ${s.stuckTasksCount} tareas que quedaron atascadas`
     ctx += '\n'
   }
+  if (s.medianMinutes > 0) {
+    const parts = [`mediana ${s.medianMinutes}m/tarea`]
+    if (s.quickWins > 0) parts.push(`${s.quickWins} quick wins (<30m)`)
+    if (s.deepWork  > 0) parts.push(`${s.deepWork} trabajo profundo (≥90m)`)
+    ctx += `Velocidad: ${parts.join(', ')}\n`
+  }
+  if (s.feedbackScore !== null && s.feedbackScore !== undefined) {
+    ctx += `Receptividad al coaching: ${Math.round(s.feedbackScore * 100)}% de insights aceptados\n`
+  }
+  if (Array.isArray(s.porProyecto) && s.porProyecto.length > 0) {
+    ctx += 'Por proyecto (historial):\n'
+    for (const p of s.porProyecto) {
+      const pct = p.creadas > 0 ? Math.round(p.completadas / p.creadas * 100) : 0
+      const h = Math.floor(p.minutes / 60)
+      const m = p.minutes % 60
+      const timeStr = p.minutes > 0 ? ` (${h > 0 ? h + 'h' : ''}${m > 0 ? m + 'm' : ''})` : ''
+      ctx += `  ${p.nombre}: ${p.completadas}/${p.creadas} completadas (${pct}%)${timeStr}\n`
+    }
+  }
   if (memories.length > 1) {
     ctx += 'Evolución por semana:\n'
-    for (const m of memories.slice(1)) {
-      const ms = m.estadisticas || {}
+    for (const mem of memories.slice(1)) {
+      const ms = mem.estadisticas || {}
       if (ms.tasaCompletado !== undefined) {
-        ctx += `  ${m.weekStart}: ${Math.round(ms.tasaCompletado * 100)}% completado`
+        ctx += `  ${mem.weekStart}: ${Math.round(ms.tasaCompletado * 100)}% completado`
         if (ms.promedioTareasPorDia) ctx += `, ${ms.promedioTareasPorDia} tareas/día`
-        if (ms.stuckTasksCount > 0) ctx += `, ${ms.stuckTasksCount} atascadas`
+        if (ms.stuckTasksCount > 0)  ctx += `, ${ms.stuckTasksCount} atascadas`
         ctx += '\n'
       }
     }
