@@ -77,8 +77,8 @@ async function userSummary(req, res, next) {
         select: { loginAt: true },
       }),
       prisma.projectMember.findMany({
-        where: { userId },
-        include: { project: { select: { id: true, name: true, active: true } } },
+        where: { userId, project: { active: true } },
+        include: { project: { select: { id: true, name: true } } },
       }),
     ])
 
@@ -124,15 +124,13 @@ async function updateVacationDays(req, res, next) {
 // Stats globales para el mini dashboard
 async function dashboardStats(req, res, next) {
   try {
-    const [activeUsers, totalMemberships] = await Promise.all([
+    const [activeUsers, activeProjects] = await Promise.all([
       prisma.user.count({ where: { active: true } }),
-      prisma.projectMember.count({
-        where: { user: { active: true } },
-      }),
+      prisma.project.count({ where: { active: true } }),
     ])
     res.json({
       projectsPerPerson: activeUsers > 0
-        ? Math.round((totalMemberships / activeUsers) * 10) / 10
+        ? Math.round((activeProjects / activeUsers) * 10) / 10
         : 0,
     })
   } catch (err) { next(err) }

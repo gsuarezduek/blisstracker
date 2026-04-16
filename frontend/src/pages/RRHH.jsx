@@ -204,7 +204,7 @@ function MiniDashboard({ users, lastLoginsMap, dashStats }) {
         <StatCard icon="👥" label="Personas activas"      value={activeUsers.length} />
         <StatCardSlider slides={[
           { icon: '📅', label: 'Antigüedad promedio',       value: avgTenureYears,                        sub: 'del equipo activo' },
-          { icon: '📁', label: 'Proyectos por persona',     value: dashStats.projectsPerPerson,           sub: 'promedio de asignaciones' },
+          { icon: '📁', label: 'Proyectos por persona',     value: dashStats.projectsPerPerson,           sub: 'proyectos activos ÷ equipo' },
           { icon: '🕐', label: 'Horario promedio de ingreso', value: globalAvgLoginTime ?? '—',           sub: 'sobre últimos registros' },
         ]} />
         <StatCardSlider slides={[
@@ -666,8 +666,8 @@ function TabLegajos({ users, onVacationUpdate }) {
                   : <div className="flex flex-col gap-1.5">
                       {summary.projects.map(p => (
                         <div key={p.id} className="flex items-center gap-1.5">
-                          <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${p.active ? 'bg-green-400' : 'bg-gray-300 dark:bg-gray-600'}`} />
-                          <p className={`text-sm truncate ${p.active ? 'text-gray-800 dark:text-gray-200' : 'text-gray-400 dark:text-gray-500'}`}>{p.name}</p>
+                          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-green-400" />
+                          <p className="text-sm truncate text-gray-800 dark:text-gray-200">{p.name}</p>
                         </div>
                       ))}
                     </div>
