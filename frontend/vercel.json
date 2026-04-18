@@ -1,3 +1,12 @@
 {
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "destination": "https://blissmkt.blisstracker.app/$1",
+      "permanent": true
+    }
+  ]
 }
+
